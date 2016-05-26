@@ -1208,8 +1208,13 @@ void t_cocoa_generator::generate_cocoa_struct_description(ofstream& out, t_struc
       indent(out) << "[ms appendString: @\"," << (*f_iter)->get_name() << ":\"];" << endl;
     }
     t_type* ttype = (*f_iter)->get_type();
-    indent(out) << "[ms appendFormat: @\"" << format_string_for_type(ttype) << "\", __"
-                << (*f_iter)->get_name() << "];" << endl;
+    if ((*f_iter)->is_redacted()) {
+      indent(out) << "[ms appendString: @\"<REDACTED>\"];" << endl;
+    } else {
+      string fieldName = "__" + (*f_iter)->get_name();
+      indent(out) << "[ms appendFormat: @\"" << format_string_for_type(ttype) << "\", "
+                  << fieldName << "];" << endl;
+    }
   }
   out << indent() << "[ms appendString: @\")\"];" << endl << indent()
       << "return [NSString stringWithString: ms];" << endl;

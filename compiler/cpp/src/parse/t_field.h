@@ -20,6 +20,8 @@
 #ifndef T_FIELD_H
 #define T_FIELD_H
 
+#include <algorithm>
+#include <cctype>
 #include <string>
 #include <sstream>
 
@@ -43,7 +45,8 @@ public:
       xsd_optional_(false),
       xsd_nillable_(false),
       xsd_attrs_(NULL),
-      reference_(false) {}
+      reference_(false),
+      is_redacted_(false) {}
 
   t_field(t_type* type, std::string name, int32_t key)
     : type_(type),
@@ -54,7 +57,8 @@ public:
       xsd_optional_(false),
       xsd_nillable_(false),
       xsd_attrs_(NULL),
-      reference_(false) {}
+      reference_(false),
+			is_redacted_(false)	{}
 
   ~t_field() {}
 
@@ -86,6 +90,8 @@ public:
 
   t_struct* get_xsd_attrs() { return xsd_attrs_; }
 
+	bool is_redacted() const { return is_redacted_;	}
+
   /**
    * Comparator to sort fields in ascending order by key.
    * Make this a functor instead of a function to help GCC inline it.
@@ -103,6 +109,11 @@ public:
 
   void set_reference(bool reference) { reference_ = reference; }
 
+	void set_doc(const std::string &doc) {
+    t_doc::set_doc(doc);
+		check_redaction();
+	}
+
 private:
   t_type* type_;
   std::string name_;
@@ -114,6 +125,38 @@ private:
   bool xsd_nillable_;
   t_struct* xsd_attrs_;
   bool reference_;
+
+
+	bool is_redacted_;
+
+	void check_redaction() {
+    typedef std::map<std::string, std::string>::const_iterator map_iterator;
+    typedef std::vector<std::string>::const_iterator vec_iterator;
+
+    if (has_doc()) {
+      std::string tmp(get_doc());
+			std::transform(tmp.begin(), tmp.end(), tmp.begin(), ::tolower);
+
+			if (tmp.find("@redacted") != std::string::npos) {
+				is_redacted_ = true;
+				return;
+			}
+		}
+
+		std::vector<std::string> annos(2);
+		annos.push_back("redacted");
+		annos.push_back("thrifty.redacted");
+
+		for (vec_iterator vit = annos.begin(); vit != annos.end(); ++vit) {
+			map_iterator mit = annotations_.find(*vit);
+			if (mit != annotations_.end() && mit->second != "false") {
+				is_redacted_ = true;
+				return;
+			}
+		}
+
+		is_redacted_ = false;
+	}
 };
 
 /**
