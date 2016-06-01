@@ -90,7 +90,7 @@ public:
 
   t_struct* get_xsd_attrs() { return xsd_attrs_; }
 
-	bool is_redacted() const { return is_redacted_;	}
+  bool is_redacted() const { return is_redacted_; }
 
   /**
    * Comparator to sort fields in ascending order by key.
@@ -109,10 +109,10 @@ public:
 
   void set_reference(bool reference) { reference_ = reference; }
 
-	void set_doc(const std::string &doc) {
+  void set_doc(const std::string &doc) {
     t_doc::set_doc(doc);
-		check_redaction();
-	}
+    check_redaction();
+  }
 
 private:
   t_type* type_;
@@ -127,36 +127,36 @@ private:
   bool reference_;
 
 
-	bool is_redacted_;
+  bool is_redacted_;
 
-	void check_redaction() {
+  void check_redaction() {
     typedef std::map<std::string, std::string>::const_iterator map_iterator;
     typedef std::vector<std::string>::const_iterator vec_iterator;
 
     if (has_doc()) {
       std::string tmp(get_doc());
-			std::transform(tmp.begin(), tmp.end(), tmp.begin(), ::tolower);
+      std::transform(tmp.begin(), tmp.end(), tmp.begin(), ::tolower);
 
-			if (tmp.find("@redacted") != std::string::npos) {
-				is_redacted_ = true;
-				return;
-			}
-		}
+      if (tmp.find("@redacted") != std::string::npos) {
+        is_redacted_ = true;
+	return;
+      }
+    }
 
-		std::vector<std::string> annos(2);
-		annos.push_back("redacted");
-		annos.push_back("thrifty.redacted");
+    std::vector<std::string> annos(2);
+    annos.push_back("redacted");
+    annos.push_back("thrifty.redacted");
 
-		for (vec_iterator vit = annos.begin(); vit != annos.end(); ++vit) {
-			map_iterator mit = annotations_.find(*vit);
-			if (mit != annotations_.end() && mit->second != "false") {
-				is_redacted_ = true;
-				return;
-			}
-		}
+    for (vec_iterator vit = annos.begin(); vit != annos.end(); ++vit) {
+      map_iterator mit = annotations_.find(*vit);
+      if (mit != annotations_.end() && mit->second != "false") {
+        is_redacted_ = true;
+        return;
+      }
+    }
 
-		is_redacted_ = false;
-	}
+    is_redacted_ = false;
+  }
 };
 
 /**

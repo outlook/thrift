@@ -19,6 +19,7 @@
 
 #include <string>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <vector>
 
@@ -28,6 +29,8 @@
 #include "t_oop_generator.h"
 #include "platform.h"
 
+#include <boost/lexical_cast.hpp>
+
 using std::map;
 using std::ofstream;
 using std::ostringstream;
@@ -36,6 +39,36 @@ using std::stringstream;
 using std::vector;
 
 static const string endl = "\n"; // avoid ostream << std::endl flushes
+
+namespace {
+  std::string json(std::string str) {
+    stringstream result;
+
+    for (std::string::const_iterator iter = str.begin(); iter != str.end(); ++iter) {
+      char c = *iter;
+
+      switch (c) {
+        case '"':  result << "\\\""; break;
+        case '\\': result << "\\\\"; break;
+        case '\b': result <<  "\\b"; break;
+        case '\f': result <<  "\\f"; break;
+        case '\r': result <<  "\\r"; break;
+        case '\n': result <<  "\\n"; break;
+        case '\t': result <<  "\\t"; break;
+        default:
+          if (c < 32) {
+            result << "\\u" << std::hex << std::setw(4) << std::setfill('0') << (int) c;
+          } else {
+            result << c;
+          }
+          break;
+      }
+    }
+
+    return result.str();
+  }
+
+}
 
 /**
  * Objective-C code generator.
@@ -59,6 +92,9 @@ public:
 
     iter = parsed_options.find("async_clients");
     async_clients_ = (iter != parsed_options.end());
+
+    iter = parsed_options.find("emit_to_json");
+    emit_to_json_ = (iter != parsed_options.end());
 
     out_dir_base_ = "gen-cocoa";
   }
@@ -121,6 +157,8 @@ public:
   void generate_cocoa_struct_writer(std::ofstream& out, t_struct* tstruct);
   void generate_cocoa_struct_validator(std::ofstream& out, t_struct* tstruct);
   void generate_cocoa_struct_description(std::ofstream& out, t_struct* tstruct);
+  void generate_cocoa_struct_to_json(std::ofstream& out, t_struct* tstruct);
+  void generate_cocoa_struct_to_json_method(std::ofstream& out, t_field *field, int &counter, size_t levels, bool needs_isset_test);
 
   std::string function_result_helper_struct_type(t_function* tfunction);
   std::string function_args_helper_struct_type(t_function* tfunction);
@@ -207,6 +245,14 @@ public:
   std::string containerize(t_type* ttype, std::string fieldName);
   std::string decontainerize(t_field* tfield, std::string fieldName);
 
+  std::string container_safe_typename(t_type *type);
+
+  /**
+   * MS-specific
+   */
+  std::string to_json_protocol();
+  std::string json_escape_function();
+
   bool type_can_be_null(t_type* ttype) {
     ttype = get_true_type(ttype);
 
@@ -228,6 +274,7 @@ private:
   bool log_unexpected_;
   bool validate_required_;
   bool async_clients_;
+  bool emit_to_json_;
 };
 
 /**
@@ -248,6 +295,10 @@ void t_cocoa_generator::init_generator() {
 
   f_header_ << cocoa_imports() << cocoa_thrift_imports();
 
+  if (emit_to_json_) {
+    f_header_ << to_json_protocol();
+  }
+
   // ...and a .m implementation file
   string f_impl_name = get_out_dir() + program_name_ + ".m";
   f_impl_.open(f_impl_name.c_str());
@@ -256,6 +307,10 @@ void t_cocoa_generator::init_generator() {
 
   f_impl_ << cocoa_imports() << cocoa_thrift_imports() << "#import \"" << f_header_name << "\""
           << endl << endl;
+
+  if (emit_to_json_) {
+    f_impl_ << json_escape_function() << endl;
+  }
 }
 
 /**
@@ -295,6 +350,97 @@ string t_cocoa_generator::cocoa_thrift_imports() {
 }
 
 /**
+ * Declares an Objective-C protocol for converting thrifts to
+ * JSON strings.
+ */
+string t_cocoa_generator::to_json_protocol() {
+  return string() + "@protocol MSThriftToJson\n"
+                  + "- (void) toJson: (NSMutableString *) builder;\n"
+                  + "@end\n\n";
+}
+
+/**
+ * Declares a private category on NSMutableString for JSON-escaping strings
+ * as they are appended.
+ */
+string t_cocoa_generator::json_escape_function() {
+  return string () + "@interface NSMutableString (JsonEscaping)\n"
+                   + "\n"
+                   + "- (void) appendJsonString: (NSString *)toEscape;\n"
+                   + "- (void) appendJsonData: (NSData *)data;\n"
+                   + "\n"
+                   + "@end\n"
+                   + "\n"
+                   + "@interface NSData (ToHex)\n"
+                   + "\n"
+                   + "- (NSString *) toHexString;\n"
+                   + "\n"
+                   + "@end\n"
+                   + "\n"
+                   + "@implementation NSMutableString (JsonEscaping)\n"
+                   + "\n"
+                   + "- (void) appendJsonString: (NSString *)toEscape {\n"
+                   + "  NSUInteger len = [toEscape length];\n"
+                   + "  unichar buffer[len];\n"
+                   + "\n"
+                   + "  [toEscape getCharacters:buffer range:NSMakeRange(0, len)];\n"
+                   + "\n"
+                   + "  [self appendString: @\"\\\"\"];\n"
+                   + "  for (int i = 0; i < len; ++i) {\n"
+                   + "    unichar c = buffer[i];\n"
+                   + "\n"
+                   + "    switch (c) {\n"
+                   + "      case '\\\\': [self appendString: @\"\\\\\\\\\"]; break;\n"
+                   + "      case '\\b': [self appendString:  @\"\\\\b\"]; break;\n"
+                   + "      case '\\f': [self appendString:  @\"\\\\f\"]; break;\n"
+                   + "      case '\\n': [self appendString:  @\"\\\\n\"]; break;\n"
+                   + "      case '\\r': [self appendString:  @\"\\\\r\"]; break;\n"
+                   + "      case '\\t': [self appendString:  @\"\\\\t\"]; break;\n"
+                   + "      default:\n"
+                   + "        if (c < 32 || c > 127) {\n"
+                   + "          [self appendFormat:@\"\\\\u%04x\", (int) c];\n"
+                   + "        } else {\n"
+                   + "          [self appendFormat:@\"%C\", c];\n"
+                   + "        }\n"
+                   + "        break;\n"
+                   + "    }\n"
+                   + "  }\n"
+                   + "  [self appendString: @\"\\\"\"];\n"
+                   + "}\n"
+                   + "\n"
+                   + "- (void) appendJsonData: (NSData *)data {\n"
+                   + "  [self appendJsonString:[data toHexString]];\n"
+                   + "}\n"
+                   + "\n"
+                   + "@end\n"
+                   + "\n"
+                   + "@implementation NSData (ToHex)\n"
+                   + "\n"
+                   + "- (NSString *) toHexString {\n"
+                   + "  static char const *kHexAlphabet = \"0123456789ABCDEF\";\n"
+                   + "  NSUInteger numBytes = self.length;\n"
+                   + "\n"
+                   + "  if (numBytes > 0) {\n"
+                   + "    const unsigned char *data = self.bytes;\n"
+                   + "    char *hex = malloc(sizeof(char) * (numBytes * 2 + 1));\n"
+                   + "    char *p = hex;\n"
+                   + "    for (NSUInteger i = 0; i < numBytes; ++i) {\n"
+                   + "      *p++ = kHexAlphabet[((*data & 0xF0) >> 4)];\n"
+                   + "      *p++ = kHexAlphabet[ (*data & 0x0F)      ];\n"
+                   + "      ++data;\n"
+                   + "    }\n"
+                   + "    NSString *result = [NSString stringWithUTF8String:hex];\n"
+                   + "    free(hex);\n"
+                   + "    return result;\n"
+                   + "  } else {\n"
+                   + "    return @\"\";\n"
+                   + "  }\n"
+                   + "}\n"
+                   + "\n"
+                   + "@end\n\n";
+}
+
+/**
  * Finish up generation.
  */
 void t_cocoa_generator::close_generator() {
@@ -322,7 +468,9 @@ void t_cocoa_generator::generate_typedef(t_typedef* ttypedef) {
  * @param tenum The enumeration
  */
 void t_cocoa_generator::generate_enum(t_enum* tenum) {
-  f_header_ << indent() << "enum " << cocoa_prefix_ << tenum->get_name() << " {" << endl;
+  string name = cocoa_prefix_ + tenum->get_name();
+
+  f_header_ << indent() << "enum " << name << " {" << endl;
   indent_up();
 
   vector<t_enum_value*> constants = tenum->get_constants();
@@ -340,6 +488,23 @@ void t_cocoa_generator::generate_enum(t_enum* tenum) {
 
   indent_down();
   f_header_ << endl << "};" << endl << endl;
+
+  // Generate name-lookup function
+  f_header_ << "NSString* nameOf" << name << "(enum " << name << " value);\n\n";
+
+  f_impl_ << "NSString* nameOf" << name << "(enum " << name << " value) {\n";
+
+  indent(f_impl_, 1) << "switch (value) {\n";
+
+  for (c_iter = constants.begin(); c_iter != constants.end(); ++c_iter) {
+    indent(f_impl_, 2) << "case " << tenum->get_name() << "_" << (*c_iter)->get_name() << ": return @\"" << (*c_iter)->get_name() << "\";\n";
+  }
+
+  indent(f_impl_, 2) << "default: return @\"UNKNOWN\";\n";
+
+  indent(f_impl_, 1) << "}\n";
+
+  f_impl_ << "}\n\n";
 }
 
 /**
@@ -448,7 +613,11 @@ void t_cocoa_generator::generate_cocoa_struct_interface(ofstream& out,
   } else {
     out << "NSObject ";
   }
-  out << "<TBase, NSCoding> ";
+  out << "<TBase, NSCoding";
+  if (emit_to_json_) {
+    out << ", MSThriftToJson";
+  }
+  out << "> ";
 
   scope_up(out);
 
@@ -457,7 +626,7 @@ void t_cocoa_generator::generate_cocoa_struct_interface(ofstream& out,
 
   const vector<t_field*>& members = tstruct->get_members();
 
-  // member varialbes
+  // member variables
   vector<t_field*>::const_iterator m_iter;
   for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
     out << indent() << declare_field(*m_iter) << endl;
@@ -883,6 +1052,11 @@ void t_cocoa_generator::generate_cocoa_struct_implementation(ofstream& out,
   generate_cocoa_struct_validator(out, tstruct);
   generate_cocoa_struct_description(out, tstruct);
 
+  // the toJson method
+  if (emit_to_json_) {
+    generate_cocoa_struct_to_json(out, tstruct);
+  }
+
   out << "@end" << endl << endl;
 }
 
@@ -1221,6 +1395,199 @@ void t_cocoa_generator::generate_cocoa_struct_description(ofstream& out, t_struc
 
   indent_down();
   indent(out) << "}" << endl << endl;
+}
+
+
+void t_cocoa_generator::generate_cocoa_struct_to_json(ofstream& out, t_struct* tstruct) {
+  out << "- (void) toJson: (NSMutableString *) builder {" << endl;
+
+  indent(out, 1) << "[builder appendString:@\"{\\\"__type\\\": \\\"" << json(tstruct->get_name()) << "\\\"\"];\n";
+
+  const vector<t_field*>& fields = tstruct->get_members();
+  vector<t_field*>::const_iterator iter;
+
+  int counter = 1;
+  for (iter = fields.begin(); iter != fields.end(); ++iter) {
+    t_field *field = *iter;
+
+    indent(out, 1) << "[builder appendString:@\", \\\"" << field->get_name() << "\\\": \"];\n";
+
+    generate_cocoa_struct_to_json_method(out, field, counter, 1, false);
+  }
+
+  indent(out, 1) << "[builder appendString:@\"}\"];\n";
+
+  out << "}\n\n";
+}
+
+void t_cocoa_generator::generate_cocoa_struct_to_json_method(
+    std::ofstream& out,
+    t_field *field,
+    int &counter,
+    size_t levels,
+    bool is_container_element) {
+  using boost::lexical_cast;
+
+  t_type *type = field->get_type();
+  
+  if (field->is_redacted()) {
+    indent(out, levels) << "[builder appendString:@\"\\\"<REDACTED>\\\"\"];\n";
+    return;
+  }
+  
+  string field_name;
+  string is_set;
+  size_t nl; // take it to the next level
+  if (!is_container_element) {
+    nl = levels + 1;
+    field_name = "__" + field->get_name();
+    is_set = field_name + "_isset";
+    indent(out, levels) << "if (" << is_set << ") {\n";
+  } else {
+    nl = levels;
+    field_name = field->get_name();
+    is_set = "<UNUSED_IS_SET_ACCESSOR>";
+  }
+
+  if (type->is_base_type()) {
+    typedef t_base_type::t_base tbase;
+    t_base_type *base_type = static_cast<t_base_type*>(type);
+    tbase base = base_type->get_base();
+
+    if (base == t_base_type::TYPE_BYTE) {
+      string accessor;
+      if (is_container_element) {
+        accessor = "[" + field_name + " unsignedCharValue];";
+      } else {
+        accessor = field_name;
+      }
+      indent(out, nl) << "[builder appendFormat:@\"%2x\", " << accessor << "];\n";
+    } else if (base == t_base_type::TYPE_I16 || base == t_base_type::TYPE_I32 || base == t_base_type::TYPE_I64) {
+      string format_spec;
+      if (is_container_element) {
+        format_spec = "%@";
+      } else {
+        format_spec = "%d";
+      }
+      indent(out, nl) << "[builder appendFormat:@\"" << format_spec << "\", " << field_name << "];\n";
+    } else if (base == t_base_type::TYPE_BOOL) {
+      string accessor;
+      if (is_container_element) {
+        accessor = "[" + field_name + " boolValue]";
+      } else {
+        accessor = field_name;
+      }
+      indent(out, nl) << "[builder appendString:(" << accessor << " ? @\"true\" : @\"false\")];\n";
+    } else if (base == t_base_type::TYPE_DOUBLE) {
+      string spec;
+      if (is_container_element) {
+        spec = "%@";
+      } else {
+        spec = "%f";
+      }
+      indent(out, nl) << "[builder appendFormat:@\"" << spec << "\", " << field_name << "];\n";
+    } else if (base == t_base_type::TYPE_STRING && base_type->is_binary()) {
+      indent(out, nl) << "[builder appendJsonData:" << field_name << "];\n";
+    } else if (base == t_base_type::TYPE_STRING) {
+      indent(out, nl) << "[builder appendJsonString:" << field_name << "];\n";
+    } else {
+      throw "what r u doing";
+    }
+  } else if (type->is_enum()) {
+    string enum_name = cocoa_prefix_ + type->get_name();
+    indent(out, nl) << "[builder appendFormat:@\"\\\"%@\\\"\", nameOf" << enum_name << "(" << field_name << ")];\n";
+  } else if (type->is_list() || type->is_set()) {
+    t_type *element_type;
+    if (type->is_list()) {
+      element_type = static_cast<t_list*>(type)->get_elem_type();
+    } else {
+      element_type = static_cast<t_set*>(type)->get_elem_type();
+    }
+    string element_name = container_safe_typename(element_type);
+    string first_flag = "first_" + lexical_cast<string>(counter++);
+    string iter = "element_" + lexical_cast<string>(counter++);
+
+    t_field fake_field(element_type, iter);
+    if (element_type->is_enum()) {
+      // It takes a bit of a dance to get a properly-unboxed field
+      string unboxed_name = decontainerize(&fake_field, iter);
+      fake_field = t_field(element_type, unboxed_name);
+    }
+
+    indent(out, nl) << "[builder appendString:@\"[\"];\n";
+    indent(out, nl) << element_name << " " << iter << ";\n";
+    indent(out, nl) << "BOOL " << first_flag << " = YES;\n";
+    indent(out, nl) << "for (" << iter << " in " << field_name << ") {\n";
+    indent(out, nl + 1) << "if (!" << first_flag << ") {\n";
+    indent(out, nl + 2) << "[builder appendString:@\", \"];\n";
+    indent(out, nl + 1) << "} else {\n";
+    indent(out, nl + 2) << first_flag << " = NO;\n";
+    indent(out, nl + 1) << "}\n";
+
+    generate_cocoa_struct_to_json_method(out, &fake_field, counter, nl + 1, true);
+
+    indent(out, nl) << "}\n";
+    indent(out, nl) << "[builder appendString:@\"]\"];\n";
+  } else if (type->is_map()) {
+    t_map *map_type = static_cast<t_map*>(type);
+    t_type *key_type = map_type->get_key_type();
+    t_type *val_type = map_type->get_val_type();
+
+    string key_type_name = container_safe_typename(key_type);
+    string val_type_name = container_safe_typename(val_type);
+
+    string first_flag = "first_" + lexical_cast<string>(counter++);
+    string key_name = "key_" + lexical_cast<string>(counter++);
+    string val_name = "value_" + lexical_cast<string>(counter++);
+
+    indent(out, nl) << "[builder appendString:@\"{\"];\n";
+    indent(out, nl) << key_type_name << " " << key_name << ";\n";
+    indent(out, nl) << "BOOL " << first_flag << " = YES;\n";
+    indent(out, nl) << "for (" << key_name << " in " << field_name << ") {\n";
+    indent(out, nl + 1) << "if (!" << first_flag << ") {\n";
+    indent(out, nl + 2) << "[builder appendString:@\", \"];\n";
+    indent(out, nl + 1) << "} else {\n";
+    indent(out, nl + 2) << first_flag << " = NO;\n";
+    indent(out, nl + 1) << "}\n";
+
+    indent(out, nl + 1) << val_type_name << " " << val_name << " = [" << field_name << " objectForKey:" << key_name << "];\n";
+
+    t_field fake_key_field(key_type, key_name);
+    t_field boxed_fake_val_field(val_type, val_name);
+    string unboxed_name = decontainerize(&boxed_fake_val_field, val_name);
+    t_field fake_val_field(val_type, unboxed_name);
+  
+    // Keys in JSON *must* be strings; make it so.
+    // Super hacky; assumes keys are always values, and never structs or collections.
+    if (key_type->is_string()) {
+      string append_method;
+      t_base_type *base = static_cast<t_base_type*>(type);
+      if (base->is_binary()) {
+        append_method = "appendJsonData:";
+      } else {
+        append_method = "appendJsonString:";
+      }
+      indent(out, nl + 1) << "[builder " << append_method << key_name << "];\n";
+    } else {
+      indent(out, nl + 1) << "[builder appendFormat:@\"\\\"%@\\\"\", " << key_name << "];\n";
+    }
+
+    indent(out, nl + 1) << "[builder appendString:@\": \"];\n";
+    generate_cocoa_struct_to_json_method(out, &fake_val_field, counter, nl + 1, true);
+
+    indent(out, nl) << "}\n";
+    indent(out, nl) << "[builder appendString:@\"}\"];\n";
+  } else if (type->is_struct() || type->is_xception()) {
+    indent(out, nl) << "[" << field_name << " toJson:builder];\n";
+  } else {
+    throw "unexpected type";
+  }
+
+  if (!is_container_element) {
+    indent(out, levels) << "} else {\n";
+    indent(out, levels + 1) << "[builder appendString:@\"null\"];\n";
+    indent(out, levels) << "}\n";
+  }
 }
 
 /**
@@ -2010,6 +2377,42 @@ string t_cocoa_generator::containerize(t_type* ttype, string fieldName) {
 
   // do nothing
   return fieldName;
+}
+
+std::string t_cocoa_generator::container_safe_typename(t_type *type) {
+  if (type->is_enum()) return "NSNumber *";
+  if (type->is_struct() || type->is_xception()) {
+    return cocoa_prefix_ + type->get_name() + " *";
+  }
+
+  if (type->is_list()) return "NSArray *";
+  if (type->is_map())  return "NSDictionary *";
+  if (type->is_set())  return "NSSet *";
+
+  if (!type->is_base_type()) {
+    throw "compiler error: unexpected type: " + type->get_name();
+  }
+
+  t_base_type::t_base tbase = static_cast<t_base_type*>(type)->get_base();
+
+  switch (tbase) {
+    case t_base_type::TYPE_STRING:
+      if (static_cast<t_base_type*>(type)->is_binary()) {
+        return "NSData *";
+      } else {
+        return "NSString *";
+      }
+
+    case t_base_type::TYPE_BOOL:
+    case t_base_type::TYPE_BYTE:
+    case t_base_type::TYPE_I16:
+    case t_base_type::TYPE_I32:
+    case t_base_type::TYPE_I64:
+    case t_base_type::TYPE_DOUBLE:
+      return "NSNumber *";
+    default:
+      throw "compiler error: no Objective-C name for base type " + t_base_type::t_base_name(tbase);
+  }
 }
 
 /**
