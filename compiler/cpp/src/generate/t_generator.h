@@ -165,6 +165,14 @@ protected:
   }
 
   /**
+   * Indent the input stream a given number of indent levels
+   */
+  std::ostream& indent(std::ostream& os, size_t times) {
+    std::string ind(times * 2, ' ');
+    return os << ind;
+  }
+
+  /**
    * Indentation utility wrapper
    */
   std::ostream& indent(std::ostream& os) { return os << indent(); }
