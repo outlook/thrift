@@ -354,7 +354,7 @@ string t_cocoa_generator::cocoa_thrift_imports() {
  * JSON strings.
  */
 string t_cocoa_generator::to_json_protocol() {
-  return string() + "@protocol MSThriftToJson\n"
+  return string() + "@protocol ThriftToJson\n"
                   + "- (void) toJson: (NSMutableString *) builder;\n"
                   + "@end\n\n";
 }
@@ -364,80 +364,63 @@ string t_cocoa_generator::to_json_protocol() {
  * as they are appended.
  */
 string t_cocoa_generator::json_escape_function() {
-  return string () + "@interface NSMutableString (JsonEscaping)\n"
-                   + "\n"
-                   + "- (void) appendJsonString: (NSString *)toEscape;\n"
-                   + "- (void) appendJsonData: (NSData *)data;\n"
-                   + "\n"
-                   + "@end\n"
-                   + "\n"
-                   + "@interface NSData (ToHex)\n"
-                   + "\n"
-                   + "- (NSString *) toHexString;\n"
-                   + "\n"
-                   + "@end\n"
-                   + "\n"
-                   + "@implementation NSMutableString (JsonEscaping)\n"
-                   + "\n"
-                   + "- (void) appendJsonString: (NSString *)toEscape {\n"
-                   + "  NSUInteger len = [toEscape length];\n"
-                   + "  unichar buffer[len];\n"
-                   + "\n"
-                   + "  [toEscape getCharacters:buffer range:NSMakeRange(0, len)];\n"
-                   + "\n"
-                   + "  [self appendString: @\"\\\"\"];\n"
-                   + "  for (int i = 0; i < len; ++i) {\n"
-                   + "    unichar c = buffer[i];\n"
-                   + "\n"
-                   + "    switch (c) {\n"
-                   + "      case '\\\\': [self appendString: @\"\\\\\\\\\"]; break;\n"
-                   + "      case '\\b': [self appendString:  @\"\\\\b\"]; break;\n"
-                   + "      case '\\f': [self appendString:  @\"\\\\f\"]; break;\n"
-                   + "      case '\\n': [self appendString:  @\"\\\\n\"]; break;\n"
-                   + "      case '\\r': [self appendString:  @\"\\\\r\"]; break;\n"
-                   + "      case '\\t': [self appendString:  @\"\\\\t\"]; break;\n"
-                   + "      default:\n"
-                   + "        if (c < 32 || c > 127) {\n"
-                   + "          [self appendFormat:@\"\\\\u%04x\", (int) c];\n"
-                   + "        } else {\n"
-                   + "          [self appendFormat:@\"%C\", c];\n"
-                   + "        }\n"
-                   + "        break;\n"
-                   + "    }\n"
-                   + "  }\n"
-                   + "  [self appendString: @\"\\\"\"];\n"
-                   + "}\n"
-                   + "\n"
-                   + "- (void) appendJsonData: (NSData *)data {\n"
-                   + "  [self appendJsonString:[data toHexString]];\n"
-                   + "}\n"
-                   + "\n"
-                   + "@end\n"
-                   + "\n"
-                   + "@implementation NSData (ToHex)\n"
-                   + "\n"
-                   + "- (NSString *) toHexString {\n"
-                   + "  static char const *kHexAlphabet = \"0123456789ABCDEF\";\n"
-                   + "  NSUInteger numBytes = self.length;\n"
-                   + "\n"
-                   + "  if (numBytes > 0) {\n"
-                   + "    const unsigned char *data = self.bytes;\n"
-                   + "    char *hex = malloc(sizeof(char) * (numBytes * 2 + 1));\n"
-                   + "    char *p = hex;\n"
-                   + "    for (NSUInteger i = 0; i < numBytes; ++i) {\n"
-                   + "      *p++ = kHexAlphabet[((*data & 0xF0) >> 4)];\n"
-                   + "      *p++ = kHexAlphabet[ (*data & 0x0F)      ];\n"
-                   + "      ++data;\n"
-                   + "    }\n"
-                   + "    NSString *result = [NSString stringWithUTF8String:hex];\n"
-                   + "    free(hex);\n"
-                   + "    return result;\n"
-                   + "  } else {\n"
-                   + "    return @\"\";\n"
-                   + "  }\n"
-                   + "}\n"
-                   + "\n"
-                   + "@end\n\n";
+  stringstream out;
+  out << "static NSString* HexEncode(NSData *toEncode) {\n"
+      << "  static char const *kHexAlphabet = \"0123456789ABCDEF\";\n"
+      << "  NSUInteger numBytes = toEncode.length;\n"
+      << "\n"
+      << "  if (numBytes > 0) {\n"
+      << "    const unsigned char *data = toEncode.bytes;\n"
+      << "    char *hex = malloc(sizeof(char) * (numBytes * 2 + 1));\n"
+      << "    char *p = hex;\n"
+      << "    for (NSUInteger i = 0; i < numBytes; ++i) {\n"
+      << "      *p++ = kHexAlphabet[((*data & 0xF0) >> 4)];\n"
+      << "      *p++ = kHexAlphabet[ (*data & 0x0F)      ];\n"
+      << "      ++data;\n"
+      << "    }\n"
+      << "    NSString *result = [NSString stringWithUTF8String:hex];\n"
+      << "    free(hex);\n"
+      << "    return result;\n"
+      << "  } else {\n"
+      << "    return @\"\";\n"
+      << "  }\n"
+      << "}\n"
+      << "\n"
+      << "static void AppendJsonEscapedString(NSMutableString *ms, NSString *toEscape) {\n"
+      << "  NSUInteger len = toEscape.length;\n"
+      << "  unichar buffer[len];\n"
+      << "\n"
+      << "  [toEscape getCharacters:buffer range:NSMakeRange(0, len)];\n"
+      << "\n"
+      << "  [ms appendString:@\"\\\"\"];\n"
+      << "  for (int i = 0; i < len; ++i) {\n"
+      << "    unichar c = buffer[i];\n"
+      << "    switch (c) {\n"      
+      << "      case '\\\\': [ms appendString: @\"\\\\\\\\\"]; break;\n"
+      << "      case '\\b':  [ms appendString: @\"\\\\b\"];    break;\n"
+      << "      case '\\f':  [ms appendString: @\"\\\\f\"];    break;\n"
+      << "      case '\\n':  [ms appendString: @\"\\\\n\"];    break;\n"
+      << "      case '\\r':  [ms appendString: @\"\\\\r\"];    break;\n"
+      << "      case '\\t':  [ms appendString: @\"\\\\t\"];    break;\n"
+      << "      default:\n"
+      << "        if (c < 32 || c > 127) {\n"
+      << "          [ms appendFormat:@\"\\\\u%04x\", (int) c];\n"
+      << "        } else {\n"
+      << "          [ms appendFormat:@\"%C\", c];\n"
+      << "        }\n"
+      << "        break;\n"
+      << "    }\n"
+      << "  }\n"
+      << "  [ms appendString:@\"\\\"\"];\n"
+      << "}\n"
+      << "\n"
+      << "static void AppendJsonEscapedBinary(NSMutableString *ms, NSData *toEscape) {\n"
+      << "  [ms appendString:@\"\\\"\"];\n"
+      << "  [ms appendString:HexEncode(toEscape)];\n"
+      << "  [ms appendString:@\"\\\"\"];\n"
+      << "}\n\n";
+
+  return out.str();
 }
 
 /**
@@ -490,9 +473,9 @@ void t_cocoa_generator::generate_enum(t_enum* tenum) {
   f_header_ << endl << "};" << endl << endl;
 
   // Generate name-lookup function
-  f_header_ << "NSString* nameOf" << name << "(enum " << name << " value);\n\n";
+  f_header_ << "NSString* NameOf" << name << "(enum " << name << " value);\n\n";
 
-  f_impl_ << "NSString* nameOf" << name << "(enum " << name << " value) {\n";
+  f_impl_ << "NSString* NameOf" << name << "(enum " << name << " value) {\n";
 
   indent(f_impl_, 1) << "switch (value) {\n";
 
@@ -615,7 +598,7 @@ void t_cocoa_generator::generate_cocoa_struct_interface(ofstream& out,
   }
   out << "<TBase, NSCoding";
   if (emit_to_json_) {
-    out << ", MSThriftToJson";
+    out << ", ThriftToJson";
   }
   out << "> ";
 
@@ -1487,15 +1470,15 @@ void t_cocoa_generator::generate_cocoa_struct_to_json_method(
       }
       indent(out, nl) << "[builder appendFormat:@\"" << spec << "\", " << field_name << "];\n";
     } else if (base == t_base_type::TYPE_STRING && base_type->is_binary()) {
-      indent(out, nl) << "[builder appendJsonData:" << field_name << "];\n";
+      indent(out, nl) << "AppendJsonEscapedBinary(builder, " << field_name << ");\n";
     } else if (base == t_base_type::TYPE_STRING) {
-      indent(out, nl) << "[builder appendJsonString:" << field_name << "];\n";
+      indent(out, nl) << "AppendJsonEscapedString(builder, " << field_name << ");\n";
     } else {
       throw "what r u doing";
     }
   } else if (type->is_enum()) {
     string enum_name = cocoa_prefix_ + type->get_name();
-    indent(out, nl) << "[builder appendFormat:@\"\\\"%@\\\"\", nameOf" << enum_name << "(" << field_name << ")];\n";
+    indent(out, nl) << "[builder appendFormat:@\"\\\"%@\\\"\", NameOf" << enum_name << "(" << field_name << ")];\n";
   } else if (type->is_list() || type->is_set()) {
     t_type *element_type;
     if (type->is_list()) {
@@ -1563,11 +1546,11 @@ void t_cocoa_generator::generate_cocoa_struct_to_json_method(
       string append_method;
       t_base_type *base = static_cast<t_base_type*>(type);
       if (base->is_binary()) {
-        append_method = "appendJsonData:";
+        append_method = "AppendJsonEscapedBinary";
       } else {
-        append_method = "appendJsonString:";
+        append_method = "AppendJsonEscapedString";
       }
-      indent(out, nl + 1) << "[builder " << append_method << key_name << "];\n";
+      indent(out, nl + 1) << append_method << "(builder, " << key_name << ");\n";
     } else {
       indent(out, nl + 1) << "[builder appendFormat:@\"\\\"%@\\\"\", " << key_name << "];\n";
     }
