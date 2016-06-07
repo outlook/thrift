@@ -319,7 +319,9 @@ void t_cocoa_generator::init_generator() {
  * @return List of imports for Cocoa libraries
  */
 string t_cocoa_generator::cocoa_imports() {
-  return string() + "#import <Foundation/Foundation.h>\n" + "\n";
+  return string() + "#import <Foundation/Foundation.h>\n"
+                  + "#import <inttypes.h>\n"
+                  + "\n";
 }
 
 /**
@@ -404,7 +406,7 @@ string t_cocoa_generator::json_escape_function() {
       << "      case '\\r':  [ms appendString: @\"\\\\r\"];    break;\n"
       << "      case '\\t':  [ms appendString: @\"\\\\t\"];    break;\n"
       << "      default:\n"
-      << "        if (c < 32 || c > 127) {\n"
+      << "        if (c <= 31 || c >= 127) {\n"
       << "          [ms appendFormat:@\"\\\\u%04x\", (int) c];\n"
       << "        } else {\n"
       << "          [ms appendFormat:@\"%C\", c];\n"
@@ -1449,11 +1451,17 @@ void t_cocoa_generator::generate_cocoa_struct_to_json_method(
     } else if (base == t_base_type::TYPE_I16 || base == t_base_type::TYPE_I32 || base == t_base_type::TYPE_I64) {
       string format_spec;
       if (is_container_element) {
-        format_spec = "%@";
+        format_spec = "@\"%@\"";
+      } else if (base == t_base_type::TYPE_I16) {
+        format_spec = "@\"%\" PRId16";
+      } else if (base == t_base_type::TYPE_I32) {
+        format_spec = "@\"%\" PRId32";
+      } else if (base == t_base_type::TYPE_I64) {
+        format_spec = "@\"%\" PRId64";
       } else {
-        format_spec = "%d";
+        throw "COMPILER ERROR: unexpected non-container base type: " + type->get_name();
       }
-      indent(out, nl) << "[builder appendFormat:@\"" << format_spec << "\", " << field_name << "];\n";
+      indent(out, nl) << "[builder appendFormat:" << format_spec << ", " << field_name << "];\n";
     } else if (base == t_base_type::TYPE_BOOL) {
       string accessor;
       if (is_container_element) {

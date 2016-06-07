@@ -44,7 +44,7 @@ public:
 
   const std::string& get_doc() const { return doc_; }
 
-  bool has_doc() { return has_doc_; }
+  bool has_doc() const { return has_doc_; }
 
 private:
   std::string doc_;
