@@ -356,7 +356,7 @@ string t_cocoa_generator::cocoa_thrift_imports() {
  * JSON strings.
  */
 string t_cocoa_generator::to_json_protocol() {
-  return string() + "@protocol ThriftToJson\n"
+  return string() + "@protocol ThriftToJson <NSObject>\n"
                   + "- (void) toJson: (NSMutableString *) builder;\n"
                   + "@end\n\n";
 }
