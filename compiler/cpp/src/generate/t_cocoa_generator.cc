@@ -1403,39 +1403,39 @@ namespace {
   struct ThriftNameVisitor : public t_visitor {
     string result;
 
-    virtual void visitVoid(t_base_type *type) {
+    virtual void visitVoid(t_base_type *) {
       result = "void";
     }
 
-    virtual void visitBinary(t_base_type *type) {
+    virtual void visitBinary(t_base_type *) {
       result = "binary";
     }
 
-    virtual void visitString(t_base_type *type) {
+    virtual void visitString(t_base_type *) {
       result = "string";
     }
 
-    virtual void visitBool(t_base_type *type) {
+    virtual void visitBool(t_base_type *) {
       result = "bool";
     }
 
-    virtual void visitByte(t_base_type *type) {
+    virtual void visitByte(t_base_type *) {
       result = "byte";
     }
 
-    virtual void visitI16(t_base_type *type) {
+    virtual void visitI16(t_base_type *) {
       result = "i16";
     }
 
-    virtual void visitI32(t_base_type *type) {
+    virtual void visitI32(t_base_type *) {
       result = "i32";
     }
 
-    virtual void visitI64(t_base_type *type) {
+    virtual void visitI64(t_base_type *) {
       result = "i64";
     }
 
-    virtual void visitDouble(t_base_type *type) {
+    virtual void visitDouble(t_base_type *) {
       result = "double";
     }
 
@@ -1484,39 +1484,39 @@ namespace {
         : fieldName("__" + fieldName), isContainerElement(isContainerElement) {
     }
 
-    virtual void visitVoid(t_base_type *type) {
+    virtual void visitVoid(t_base_type *) {
       throw "visitVoid: unimplemented";
     }
 
-    virtual void visitBinary(t_base_type *type) {
+    virtual void visitBinary(t_base_type *) {
       result = "HashValue(" + fieldName + ")";
     }
 
-    virtual void visitString(t_base_type *type) {
+    virtual void visitString(t_base_type *) {
       result = "HashValue(" + fieldName + ")";
     }
 
-    virtual void visitBool(t_base_type *type) {
+    virtual void visitBool(t_base_type *) {
       result = "HashBool(" + fieldName + ")";
     }
 
-    virtual void visitByte(t_base_type *type) {
+    virtual void visitByte(t_base_type *) {
       result = "HashByte(" + fieldName + ")";
     }
 
-    virtual void visitI16(t_base_type *type) {
+    virtual void visitI16(t_base_type *) {
       result = "HashI16(" + fieldName + ")";
     }
 
-    virtual void visitI32(t_base_type *type) {
+    virtual void visitI32(t_base_type *) {
       result = "HashI32(" + fieldName + ")";
     }
 
-    virtual void visitI64(t_base_type *type) {
+    virtual void visitI64(t_base_type *) {
       result = "HashI64(" + fieldName + ")";
     }
 
-    virtual void visitDouble(t_base_type *type) {
+    virtual void visitDouble(t_base_type *) {
       result = "HashDouble(" + fieldName + ")";
     }
 
@@ -1535,15 +1535,15 @@ namespace {
       result = "(" + fieldName + " == nil ? @\"null\" : [NSString stringWithFormat:@\"" + typeName + "(size=%d)\", [" + fieldName + " count]])"; 
     }
 
-    virtual void visitStruct(t_struct *type) {
+    virtual void visitStruct(t_struct *) {
       result = "HashValue(" + fieldName + ")";
     }
 
-    virtual void visitEnum(t_enum *type) {
+    virtual void visitEnum(t_enum *) {
       result = "HashI32(" + fieldName + ")";
     }
 
-    virtual void visitService(t_service *type) {
+    virtual void visitService(t_service *) {
       result = "HashValue(" + fieldName + ")";
     }
   };
@@ -1551,21 +1551,21 @@ namespace {
   struct IsNullableVisitor : public t_visitor {
     bool result;
 
-    virtual void visitVoid(t_base_type *type) { result = false; }
-    virtual void visitBinary(t_base_type *type) { result = true; }
-    virtual void visitString(t_base_type *type) { result = true; }
-    virtual void visitBool(t_base_type *type) { result = false; }
-    virtual void visitByte(t_base_type *type) { result = false; }
-    virtual void visitI16(t_base_type *type) { result = false; }
-    virtual void visitI32(t_base_type *type) { result = false; }
-    virtual void visitI64(t_base_type *type) { result = false; }
-    virtual void visitDouble(t_base_type *type) { result = false; }
-    virtual void visitList(t_list *type) { result = true; }
-    virtual void visitSet(t_set *type) { result = true; }
-    virtual void visitMap(t_map *type) { result = true; }
-    virtual void visitStruct(t_struct *type) { result = true; }
-    virtual void visitEnum(t_enum *type) { result = false; }
-    virtual void visitService(t_service *type) { result = true; }
+    virtual void visitVoid(t_base_type *) { result = false; }
+    virtual void visitBinary(t_base_type *) { result = true; }
+    virtual void visitString(t_base_type *) { result = true; }
+    virtual void visitBool(t_base_type *) { result = false; }
+    virtual void visitByte(t_base_type *) { result = false; }
+    virtual void visitI16(t_base_type *) { result = false; }
+    virtual void visitI32(t_base_type *) { result = false; }
+    virtual void visitI64(t_base_type *) { result = false; }
+    virtual void visitDouble(t_base_type *) { result = false; }
+    virtual void visitList(t_list *) { result = true; }
+    virtual void visitSet(t_set *) { result = true; }
+    virtual void visitMap(t_map *) { result = true; }
+    virtual void visitStruct(t_struct *) { result = true; }
+    virtual void visitEnum(t_enum *) { result = false; }
+    virtual void visitService(t_service *) { result = true; }
   };
 
   string get_thrift_name(t_type *type) {
@@ -1582,11 +1582,6 @@ namespace {
 
   string obfuscate(t_field *field) {
     return obfuscate(field, field->get_name());
-  }
-
-  string obfuscate(t_field *field, string *accessor) {
-    string a = *accessor;
-    return obfuscate(field, a);
   }
 
   bool is_type_nullable(t_type *type) {

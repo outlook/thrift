@@ -30,63 +30,63 @@
 #include "t_service.h"
 
 struct t_visitor {
-  virtual void visitVoid(t_base_type *type) {
+  virtual void visitVoid(t_base_type *) {
     throw "visitVoid: unimplemented";
   }
 
-  virtual void visitBinary(t_base_type *type) {
+  virtual void visitBinary(t_base_type *) {
     throw "visitBinary: unimplemented";
   }
 
-  virtual void visitString(t_base_type *type) {
+  virtual void visitString(t_base_type *) {
     throw "visitString: unimplemented";
   }
 
-  virtual void visitBool(t_base_type *type) {
+  virtual void visitBool(t_base_type *) {
     throw "visitBool: unimplemented";
   }
 
-  virtual void visitByte(t_base_type *type) {
+  virtual void visitByte(t_base_type *) {
     throw "visitByte: unimplemented";
   }
 
-  virtual void visitI16(t_base_type *type) {
+  virtual void visitI16(t_base_type *) {
     throw "visitI16: unimplemented";
   }
 
-  virtual void visitI32(t_base_type *type) {
+  virtual void visitI32(t_base_type *) {
     throw "visitI32: unimplemented";
   }
 
-  virtual void visitI64(t_base_type *type) {
+  virtual void visitI64(t_base_type *) {
     throw "visitI64: unimplemented";
   }
 
-  virtual void visitDouble(t_base_type *type) {
+  virtual void visitDouble(t_base_type *) {
     throw "visitDouble: unimplemented";
   }
 
-  virtual void visitList(t_list *type) {
+  virtual void visitList(t_list *) {
     throw "visitList: unimplemented";
   }
 
-  virtual void visitSet(t_set *type) {
+  virtual void visitSet(t_set *) {
     throw "visitSet: unimplemented";
   }
 
-  virtual void visitMap(t_map *type) {
+  virtual void visitMap(t_map *) {
     throw "visitMap: unimplemented";
   }
 
-  virtual void visitStruct(t_struct *type) {
+  virtual void visitStruct(t_struct *) {
     throw "visitStruct: unimplemented";
   }
 
-  virtual void visitEnum(t_enum *type) {
+  virtual void visitEnum(t_enum *) {
     throw "visitEnum: unimplemented";
   }
 
-  virtual void visitService(t_service *type) {
+  virtual void visitService(t_service *) {
     throw "visitService: unimplemented";
   }
 };

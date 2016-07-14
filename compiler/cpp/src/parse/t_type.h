@@ -28,7 +28,7 @@
 
 class t_program;
 
-class t_visitor;
+struct t_visitor;
 
 
 /**
