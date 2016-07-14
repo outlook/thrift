@@ -28,6 +28,9 @@
 
 class t_program;
 
+struct t_visitor;
+
+
 /**
  * Generic representation of a thrift type. These objects are used by the
  * parser module to build up a tree of object that are all explicitly typed.
@@ -79,6 +82,8 @@ public:
     rv += nybble_to_xdigit(byte & 0x0f);
     return rv;
   }
+
+  void accept(t_visitor &visitor);
 
   std::map<std::string, std::string> annotations_;
 

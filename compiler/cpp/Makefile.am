@@ -44,6 +44,7 @@ thrift_SOURCES = src/main.cc \
                  src/audit/t_audit.h \
                  src/parse/t_doc.h \
                  src/parse/t_type.h \
+                 src/parse/t_type.cc \
                  src/parse/t_base_type.h \
                  src/parse/t_enum.h \
                  src/parse/t_enum_value.h \
@@ -60,6 +61,7 @@ thrift_SOURCES = src/main.cc \
                  src/parse/t_program.h \
                  src/parse/t_scope.h \
                  src/parse/t_const.h \
+                 src/parse/t_visitor.h \
                  src/parse/t_const_value.h \
                  src/parse/parse.cc \
                  src/generate/t_generator.h \
