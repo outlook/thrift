@@ -25,6 +25,7 @@
 #include <string>
 #include <sstream>
 
+#include "t_const.h"
 #include "t_doc.h"
 
 // Forward declare for xsd_attrs
@@ -45,8 +46,7 @@ public:
       xsd_optional_(false),
       xsd_nillable_(false),
       xsd_attrs_(NULL),
-      reference_(false),
-      is_redacted_(false) {}
+      reference_(false) {}
 
   t_field(t_type* type, std::string name, int32_t key)
     : type_(type),
@@ -57,8 +57,7 @@ public:
       xsd_optional_(false),
       xsd_nillable_(false),
       xsd_attrs_(NULL),
-      reference_(false),
-			is_redacted_(false)	{}
+      reference_(false) {}
 
   ~t_field() {}
 
@@ -117,6 +116,33 @@ public:
     return false;
   }
 
+  bool is_obfuscated() const {
+    typedef std::map<std::string, std::string>::const_iterator map_iterator;
+    typedef std::vector<std::string>::const_iterator vec_iterator;
+
+    if (has_doc()) {
+      std::string tmp(get_doc());
+      std::transform(tmp.begin(), tmp.end(), tmp.begin(), ::tolower);
+
+      if (tmp.find("@obfuscated") != std::string::npos) {
+        return true;
+      }
+    }
+
+    std::vector<std::string> annos(2);
+    annos.push_back("obfuscated");
+    annos.push_back("thrifty.obfuscated");
+
+    for (vec_iterator vit = annos.begin(); vit != annos.end(); ++vit) {
+      map_iterator mit = annotations_.find(*vit);
+      if (mit != annotations_.end() && mit->second != "false") {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   /**
    * Comparator to sort fields in ascending order by key.
    * Make this a functor instead of a function to help GCC inline it.
@@ -145,9 +171,6 @@ private:
   bool xsd_nillable_;
   t_struct* xsd_attrs_;
   bool reference_;
-
-
-  bool is_redacted_;
 };
 
 /**
