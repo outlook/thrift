@@ -1522,17 +1522,17 @@ namespace {
 
     virtual void visitList(t_list *type) {
       string typeName = get_thrift_name(type);
-      result = "[NSString stringWithFormat:@\"" + typeName + "(size=%tu)\", [" + fieldName + " count]]";
+      result = "[NSString stringWithFormat:@\"" + typeName + "(size=%lu)\", (unsigned long) [" + fieldName + " count]]";
     }
 
     virtual void visitSet(t_set *type) {
       string typeName = get_thrift_name(type);
-      result = "[NSString stringWithFormat:@\"" + typeName + "(size=%tu)\", [" + fieldName + " count]]";
+      result = "[NSString stringWithFormat:@\"" + typeName + "(size=%lu)\", (unsigned long) [" + fieldName + " count]]";
     }
 
     virtual void visitMap(t_map *type) {
       string typeName = get_thrift_name(type);
-      result = "[NSString stringWithFormat:@\"" + typeName + "(size=%tu)\", [" + fieldName + " count]]"; 
+      result = "[NSString stringWithFormat:@\"" + typeName + "(size=%lu)\", (unsigned long) [" + fieldName + " count]]"; 
     }
 
     virtual void visitStruct(t_struct *) {
