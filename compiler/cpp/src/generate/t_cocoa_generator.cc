@@ -402,6 +402,7 @@ string t_cocoa_generator::json_escape_function() {
       << "    unichar c = buffer[i];\n"
       << "    switch (c) {\n"      
       << "      case '\\\\': [ms appendString: @\"\\\\\\\\\"]; break;\n"
+      << "      case '\\\"': [ms appendString: @\"\\\\\\\"\"]; break;\n"
       << "      case '\\b':  [ms appendString: @\"\\\\b\"];    break;\n"
       << "      case '\\f':  [ms appendString: @\"\\\\f\"];    break;\n"
       << "      case '\\n':  [ms appendString: @\"\\\\n\"];    break;\n"
