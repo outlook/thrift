@@ -160,7 +160,8 @@ public:
   void generate_cocoa_struct_validator(std::ofstream& out, t_struct* tstruct);
   void generate_cocoa_struct_description(std::ofstream& out, t_struct* tstruct);
   void generate_cocoa_struct_to_json(std::ofstream& out, t_struct* tstruct);
-  void generate_cocoa_struct_to_json_method(std::ofstream& out, t_field *field, int &counter, size_t levels, bool needs_isset_test);
+  void generate_cocoa_struct_to_json_method(std::ofstream& out, t_field *field, int &counter, size_t levels, bool is_container_element);
+  void generate_cocoa_struct_to_json_method(std::ofstream& out, t_field *field, int &counter, size_t levels, bool is_container_element, bool is_map_element);
 
   std::string function_result_helper_struct_type(t_function* tfunction);
   std::string function_args_helper_struct_type(t_function* tfunction);
@@ -1669,11 +1670,21 @@ void t_cocoa_generator::generate_cocoa_struct_to_json(ofstream& out, t_struct* t
 }
 
 void t_cocoa_generator::generate_cocoa_struct_to_json_method(
+                                                             std::ofstream& out,
+                                                             t_field *field,
+                                                             int &counter,
+                                                             size_t levels,
+                                                             bool is_container_element) {
+    generate_cocoa_struct_to_json_method(out, field, counter, levels, is_container_element, false);
+}
+
+void t_cocoa_generator::generate_cocoa_struct_to_json_method(
     std::ofstream& out,
     t_field *field,
     int &counter,
     size_t levels,
-    bool is_container_element) {
+    bool is_container_element,
+    bool is_map_element) {
   using boost::lexical_cast;
 
   t_type *type = field->get_type();
@@ -1721,7 +1732,7 @@ void t_cocoa_generator::generate_cocoa_struct_to_json_method(
       }
     } else if (base == t_base_type::TYPE_I16 || base == t_base_type::TYPE_I32 || base == t_base_type::TYPE_I64) {
       string format_spec;
-      if (is_container_element) {
+      if (is_container_element && !is_map_element) {
         format_spec = "@\"%@\"";
       } else if (base == t_base_type::TYPE_I16) {
         format_spec = "@\"%\" PRId16";
@@ -1862,7 +1873,7 @@ void t_cocoa_generator::generate_cocoa_struct_to_json_method(
       }
 
       indent(out, nl + 1) << "[builder appendString:@\": \"];\n";
-      generate_cocoa_struct_to_json_method(out, &fake_val_field, counter, nl + 1, true);
+      generate_cocoa_struct_to_json_method(out, &fake_val_field, counter, nl + 1, true, true);
 
       indent(out, nl) << "}\n";
       indent(out, nl) << "[builder appendString:@\"}\"];\n";
