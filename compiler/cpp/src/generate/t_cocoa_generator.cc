@@ -1750,7 +1750,7 @@ void t_cocoa_generator::generate_cocoa_struct_to_json_method(
       }
     } else if (base == t_base_type::TYPE_BOOL) {
       string accessor;
-      if (is_container_element) {
+      if (is_container_element && !is_map_element) {
         accessor = "[" + field_name + " boolValue]";
       } else {
         accessor = field_name;
