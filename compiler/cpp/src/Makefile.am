@@ -54,23 +54,32 @@ thrift_thrift_bootstrap_SOURCES = \
                  thrift/parse/t_doc.h \
                  thrift/parse/t_type.h \
                  thrift/parse/t_base_type.h \
+                 thrift/parse/t_base_type.cc \
                  thrift/parse/t_enum.h \
+                 thrift/parse/t_enum.cc \
                  thrift/parse/t_enum_value.h \
                  thrift/parse/t_typedef.h \
                  thrift/parse/t_typedef.cc \
                  thrift/parse/t_container.h \
                  thrift/parse/t_list.h \
+                 thrift/parse/t_list.cc \
                  thrift/parse/t_set.h \
+                 thrift/parse/t_set.cc \
                  thrift/parse/t_map.h \
+                 thrift/parse/t_map.cc \
                  thrift/parse/t_struct.h \
+                 thrift/parse/t_struct.cc \
                  thrift/parse/t_field.h \
+                 thrift/parse/t_field.cc \
                  thrift/parse/t_service.h \
+                 thrift/parse/t_service.cc \
                  thrift/parse/t_function.h \
                  thrift/parse/t_program.h \
                  thrift/parse/t_scope.h \
                  thrift/parse/t_const.h \
                  thrift/parse/t_const_value.h \
                  thrift/parse/parse.cc \
+                 thrift/parse/t_visitor.h \
                  thrift/generate/t_generator.h \
                  thrift/generate/t_oop_generator.h \
                  thrift/generate/t_html_generator.h \

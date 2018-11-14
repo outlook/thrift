@@ -17,39 +17,4 @@
  * under the License.
  */
 
-#ifndef T_DOC_H
-#define T_DOC_H
-
-#include "thrift/globals.h"
-#include "thrift/logging.h"
-
-/**
- * Documentation stubs
- *
- */
-class t_doc {
-
-public:
-  t_doc() : has_doc_(false) {}
-  virtual ~t_doc() {}
-
-  void set_doc(const std::string& doc) {
-    doc_ = doc;
-    has_doc_ = true;
-    if ((g_program_doctext_lineno == g_doctext_lineno)
-        && (g_program_doctext_status == STILL_CANDIDATE)) {
-      g_program_doctext_status = ALREADY_PROCESSED;
-      pdebug("%s", "program doctext set to ALREADY_PROCESSED");
-    }
-  }
-
-  const std::string& get_doc() const { return doc_; }
-
-  bool has_doc() const { return has_doc_; }
-
-private:
-  std::string doc_;
-  bool has_doc_;
-};
-
-#endif
+#include "t_list.h"

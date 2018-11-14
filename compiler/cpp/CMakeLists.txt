@@ -52,6 +52,14 @@ add_library(parse STATIC ${parse_SOURCES})
 set(compiler_core
     src/thrift/common.cc
     src/thrift/generate/t_generator.cc
+    src/thrift/parse/t_base_type.cc
+    src/thrift/parse/t_enum.cc
+    src/thrift/parse/t_field.cc
+    src/thrift/parse/t_list.cc
+    src/thrift/parse/t_map.cc
+    src/thrift/parse/t_service.cc
+    src/thrift/parse/t_set.cc
+    src/thrift/parse/t_struct.cc
     src/thrift/parse/t_typedef.cc
     src/thrift/parse/parse.cc
     ${CMAKE_CURRENT_BINARY_DIR}/thrift/version.h
@@ -199,6 +207,7 @@ if(${WITH_PLUGIN})
       "src/thrift/parse/t_struct.h"
       "src/thrift/parse/t_typedef.h"
       "src/thrift/parse/t_type.h"
+      "src/thrift/parse/t_visitor.h"
       DESTINATION "${INCLUDE_INSTALL_DIR}/thrift/parse")
   install(FILES
       "src/thrift/plugin/plugin.h"

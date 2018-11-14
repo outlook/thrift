@@ -20,6 +20,7 @@
 
 #include "thrift/parse/t_typedef.h"
 #include "thrift/parse/t_program.h"
+#include "thrift/parse/t_visitor.h"
 
 t_type* t_typedef::get_type() const {
   if (type_ == NULL) {

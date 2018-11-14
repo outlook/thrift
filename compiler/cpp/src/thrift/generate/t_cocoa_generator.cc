@@ -19,6 +19,9 @@
 
 #include <string>
 #include <fstream>
+// Begin-MS-Specific
+#include <iomanip>
+// End-MS-Specific
 #include <iostream>
 #include <vector>
 
@@ -27,6 +30,9 @@
 #include <sstream>
 #include "thrift/platform.h"
 #include "thrift/generate/t_oop_generator.h"
+// Begin-MS-Specific
+#include "thrift/parse/t_visitor.h"
+// End-MS-Specific
 
 using std::map;
 using std::ostream;
@@ -35,6 +41,158 @@ using std::ostringstream;
 using std::string;
 using std::stringstream;
 using std::vector;
+
+// Begin-MS-Specific
+namespace {
+
+/**
+ * Gets the name of the given type as used in Thrift IDL.
+ *
+ * That is, for an i8 t_basic_type, would return the string "i8",
+ * and for a map of strings to doubles would return "map<string, double",
+ * etc.
+ */
+string name_of(t_type* t) {
+  class NameVisitor : public t_simple_visitor<string> {
+  public:
+    virtual ~NameVisitor() = default;
+
+    virtual string visit_base(t_base_type* base) {
+      return t_base_type::t_base_name(base->get_base());
+    }
+
+    virtual string visit_binary(t_base_type*) {
+      // t_base_name doesn't distinguish binary from string, so we'll do that ourselves.
+      return "binary";
+    }
+
+    virtual string visit_list(t_list* list) {
+      return "list<" + name_of(list->get_elem_type()) + ">";
+    }
+
+    virtual string visit_set(t_set* set) {
+      return "set<" + name_of(set->get_elem_type()) + ">";
+    }
+
+    virtual string visit_map(t_map* map) {
+      return "map<" + name_of(map->get_key_type()) + ", " + name_of(map->get_val_type()) + ">";
+    }
+
+    virtual string visit_enum(t_enum* tenum) {
+      return tenum->get_name();
+    }
+
+    virtual string visit_struct(t_struct* tstruct) {
+      return tstruct->get_name();
+    }
+
+    virtual string visit_service(t_service* service) {
+      return service->get_name();
+    }
+  };
+
+  NameVisitor visitor;
+  return visit<string>(t, visitor);
+}
+
+string obfuscate(t_field* field, const string& accessor) {
+  class FieldObfuscatingVisitor : public t_visitor<string> {
+  public:
+    string result;
+    string field_name;
+    bool is_container_element;
+
+    FieldObfuscatingVisitor(const string& fieldName, bool isContainerElement = false)
+        : field_name(fieldName)
+        , is_container_element(isContainerElement) {
+    }
+
+    virtual ~FieldObfuscatingVisitor() = default;
+
+    virtual string visit_bool(t_base_type*) {
+      return "HashBool(" + field_name + ")";
+    }
+
+    virtual string visit_i8(t_base_type*) {
+      return "HashI8(" + field_name + ")";
+    }
+
+    virtual string visit_i16(t_base_type*) {
+      return "HashI16(" + field_name + ")";
+    }
+
+    virtual string visit_i32(t_base_type*) {
+      return "HashI32(" + field_name + ")";
+    }
+
+    virtual string visit_i64(t_base_type*) {
+      return "HashI64(" + field_name + ")";
+    }
+
+    virtual string visit_double(t_base_type*) {
+      return "HashDouble(" + field_name + ")";
+    }
+
+    virtual string visit_string(t_base_type*) {
+      return "HashValue(" + field_name + ")";
+    }
+
+    virtual string visit_binary(t_base_type*) {
+      return "HashValue(" + field_name + ")";
+    }
+
+    virtual string visit_list(t_list* list) {
+      return "[NSString stringWithFormat:@\"" + name_of(list) + "(size=%lu)\", (unsigned long) [" + field_name + " count]]";
+    }
+
+    virtual string visit_set(t_set* set) {
+      return "[NSString stringWithFormat:@\"" + name_of(set) + "(size=%lu)\", (unsigned long) [" + field_name + " count]]";
+    }
+
+    virtual string visit_map(t_map* map) {
+      return "[NSString stringWithFormat:@\"" + name_of(map) + "(size=%lu)\", (unsigned long) [" + field_name + " count]]";
+    }
+
+    virtual string visit_enum(t_enum*) {
+      return "HashI32(" + field_name + ")";
+    }
+
+    virtual string visit_struct(t_struct*) {
+      return "HashValue(" + field_name + ")";
+    }
+  };
+
+  FieldObfuscatingVisitor visitor(accessor);
+  return visit<string>(field->get_type(), visitor);
+}
+
+string json(const string& text) {
+  stringstream ss;
+
+  for (const auto& c : text) {
+    switch (c) {
+      case '"':  ss << "\\\""; break;
+      case '\\': ss << "\\\\"; break;
+      case '\b': ss <<  "\\b"; break;
+      case '\f': ss <<  "\\f"; break;
+      case '\n': ss <<  "\\n"; break;
+      case '\r': ss <<  "\\r"; break;
+      case '\t': ss <<  "\\t"; break;
+      default:
+        if (static_cast<int>(c) < 32 || static_cast<int>(c) >= 127) {
+          ss << "\\u" << std::hex << std::setw(4) << std::setfill('0') << static_cast<int>(c);
+        } else {
+          ss << c;
+        }
+        break;
+    }
+  }
+
+  return ss.str();
+}
+
+} // end namespace
+// End-MS-Specific
 
 static const string endl = "\n"; // avoid ostream << std::endl flushes
 
@@ -58,6 +216,10 @@ public:
     promise_kit_ = false;
     debug_descriptions_ = false;
     pods_ = false;
+    // Begin-MS-Specific
+    redaction_ = false;
+    emit_to_json_ = false;
+    // End-MS-Specific
     for( iter = parsed_options.begin(); iter != parsed_options.end(); ++iter) {
       if( iter->first.compare("log_unexpected") == 0) {
         log_unexpected_ = true;
@@ -71,6 +233,12 @@ public:
         debug_descriptions_ = true;
       } else if( iter->first.compare("pods") == 0) {
         pods_ = true;
+      // Begin-MS-Specific
+      } else if( iter->first.compare("redaction") == 0) {
+        redaction_ = true;
+      } else if( iter->first.compare("emit_to_json") == 0) {
+        emit_to_json_ = true;
+      // End-MS-Specific
       } else {
         throw "unknown option cocoa:" + iter->first;
       }
@@ -88,6 +256,14 @@ public:
 
   void generate_consts(std::vector<t_const*> consts);
 
+  // Begin-MS-Specific
+  void generate_hash_function_prototypes();
+  void generate_hash_function_impl();
+
+  void generate_json_function_prototypes();
+  void generate_json_function_impl();
+  // End-MS-Specific
+
   /**
    * Program-level generation functions
    */
@@ -97,6 +273,10 @@ public:
   void generate_struct(t_struct* tstruct);
   void generate_xception(t_struct* txception);
   void generate_service(t_service* tservice);
+
+  // Begin-MS-Specific
+  void generate_enum_name_lookup(t_enum* tenum);
+  // End-MS-Specific
 
   void print_const_value(ostream& out,
                          string name,
@@ -138,6 +318,16 @@ public:
   void generate_cocoa_struct_writer(std::ofstream& out, t_struct* tstruct);
   void generate_cocoa_struct_validator(std::ofstream& out, t_struct* tstruct);
   void generate_cocoa_struct_description(std::ofstream& out, t_struct* tstruct);
+
+  // Begin-MS-specific
+  void generate_cocoa_struct_tojson(std::ostream& out, t_struct* tstruct);
+  void generate_cocoa_struct_tojson_method(std::ostream& out,
+                                           t_field* field,
+                                           int& counter,
+                                           size_t levels,
+                                           bool is_container_element,
+                                           bool is_map_element = false);
+  // End-MS-specific
 
   std::string function_result_helper_struct_type(t_service *tservice, t_function* tfunction);
   std::string function_args_helper_struct_type(t_service* tservice, t_function* tfunction);
@@ -235,6 +425,7 @@ public:
   std::string call_field_setter(t_field* tfield, std::string fieldName);
   std::string box(t_type *ttype, std::string field_name);
   std::string unbox(t_type* ttype, std::string field_name);
+  std::string field_name(t_field* field);
   std::string getter_name(string field_name);
   std::string setter_name(string field_name);
 
@@ -263,6 +454,8 @@ private:
   bool promise_kit_;
   bool debug_descriptions_;
   bool pods_;
+  bool redaction_;
+  bool emit_to_json_;
 };
 
 /**
@@ -293,6 +486,16 @@ void t_cocoa_generator::init_generator() {
   f_impl_ << cocoa_imports() << cocoa_thrift_imports() << "#import \"" << f_header_name << "\""
           << endl << endl;
 
+  // Begin-MS-Specific
+  if (redaction_ || emit_to_json_) {
+    generate_hash_function_prototypes();
+  }
+
+  if (emit_to_json_) {
+    generate_json_function_prototypes();
+  }
+  // End-MS-Specific
+
   error_constant_ = 60000;
 }
 
@@ -302,7 +505,13 @@ void t_cocoa_generator::init_generator() {
  * @return List of imports for Cocoa libraries
  */
 string t_cocoa_generator::cocoa_imports() {
-  return string() + "#import <Foundation/Foundation.h>\n" + "\n";
+  // Begin-MS-Specific
+  string imports = "#import <Foundation/Foundation.h>\n\n";
+  if (emit_to_json_) {
+    imports += "#import <inttypes.h>\n\n";
+  }
+  return imports;
+  // End-MS-Specific
 }
 
 /**
@@ -369,7 +578,170 @@ void t_cocoa_generator::close_generator() {
   // stick our constants declarations at the end of the header file
   // since they refer to things we are defining.
   f_header_ << constants_declarations_ << endl;
+
+  // Begin-MS-Specific
+  if (redaction_ || emit_to_json_) {
+    generate_hash_function_impl();
+  }
+
+  if (emit_to_json_) {
+    generate_json_function_impl();
+  }
+  // End-MS-Specific
 }
+
+// Begin-MS-Specific
+void t_cocoa_generator::generate_hash_function_prototypes() {
+  f_impl_ << R"objc(
+// Functions to support value obfuscation
+static NSString* HexEncode(NSData*);
+static NSString* HashBool(BOOL);
+static NSString* HashI8(SInt8);
+static NSString* HashI16(SInt16);
+static NSString* HashI32(SInt32);
+static NSString* HashI64(SInt64);
+static NSString* HashDouble(double);
+static NSString* HashValue(id);
+
+)objc";
+}
+
+void t_cocoa_generator::generate_hash_function_impl() {
+  f_impl_ << R"objc(
+static NSString* HexEncode(NSData *toEncode) {
+  static char const *kHexAlphabet = "0123456789ABCDEF";
+  NSUInteger numBytes = toEncode.length;
+
+  if (numBytes > 0) {
+    const unsigned char *data = toEncode.bytes;
+    char *hex = malloc(sizeof(char) * numBytes * 2);
+    char *p = hex;
+    for (NSUInteger i = 0; i < numBytes; ++i) {
+      unsigned char c = *data++;
+      *p++ = kHexAlphabet[((c & 0xF0) >> 4)];
+      *p++ = kHexAlphabet[ (c & 0x0F)      ];
+    }
+    return [[NSString alloc] initWithBytesNoCopy:hex
+                                          length:(numBytes * 2)
+                                        encoding:NSASCIIStringEncoding
+                                    freeWhenDone:YES];
+  } else {
+    return @"";
+  }
+}
+
+typedef union {
+  SInt64   i64;
+  double   d;
+  SInt32   i32;
+  SInt16   i16;
+  SInt8    i8;
+  BOOL     b;
+} t_IntConverter;
+
+static NSString* HashBool(BOOL b) {
+  t_IntConverter ic = {.i64 = 0};
+  ic.b = b;
+  return HashI64(ic.i64);
+}
+
+static NSString* HashI8(SInt8 i8) {
+  t_IntConverter ic = {.i64 = 0};
+  ic.i8 = i8;
+  return HashI64(ic.i64);
+}
+
+static NSString* HashI16(SInt16 i16) {
+  t_IntConverter ic = {.i64 = 0};
+  ic.i16 = i16;
+  return HashI64(ic.i64);
+}
+
+static NSString* HashI32(SInt32 i32) {
+  t_IntConverter ic = {.i64 = 0};
+  ic.i32 = i32;
+  return HashI64(ic.i64);
+}
+
+static NSString* HashI64(SInt64 i64) {
+  return HexEncode([NSData dataWithBytes:((const void *) (&i64)) length:sizeof(SInt64)]);
+}
+
+static NSString* HashDouble(double d) {
+  t_IntConverter ic = {.i64 = 0};
+  ic.d = d;
+  return HashI64(ic.i64);
+}
+
+static NSString* HashValue(id value) {
+  NSUInteger hash;
+  if (value == nil || ![value respondsToSelector:@selector(hash)]) {
+    hash = 0x9e3779b9;
+  } else {
+    hash = [value hash];
+  }
+  NSData *data = [NSData dataWithBytes:&hash length:sizeof(hash)];
+  return HexEncode(data);
+}
+
+)objc";
+}
+
+void t_cocoa_generator::generate_json_function_prototypes() {
+  f_header_ << R"objc(
+@protocol ThriftToJson <NSObject>
+- (void) toJson: (NSMutableString *) builder;
+@end
+
+)objc";
+
+  f_impl_ << R"objc(
+static void AppendJsonEscapedString(NSMutableString*, NSString*);
+static void AppendJsonEscapedBinary(NSMutableString*, NSData*);
+
+)objc";
+}
+
+void t_cocoa_generator::generate_json_function_impl() {
+  f_impl_ << R"objc(
+static void AppendJsonEscapedString(NSMutableString *ms, NSString *toEscape) {
+  NSUInteger len = toEscape.length;
+  unichar buffer[len];
+
+  [toEscape getCharacters:buffer range:NSMakeRange(0, len)];
+
+  [ms appendString:@"\""];
+  for (int i = 0; i < len; ++i) {
+    unichar c = buffer[i];
+    switch (c) {
+      case '\\': [ms appendString:@"\\\\"]; break;
+      case '\"': [ms appendString:@"\\\""]; break;
+      case '\b': [ms appendString:@"\\b"];  break;
+      case '\f': [ms appendString:@"\\f"];  break;
+      case '\n': [ms appendString:@"\\n"];  break;
+      case '\r': [ms appendString:@"\\r"];  break;
+      case '\t': [ms appendString:@"\\r"];  break;
+      default:
+        if (c < 32 || c >= 127) {
+          [ms appendFormat:@"\\u%04x", (int) c];
+        } else {
+          [ms appendFormat:@"%C", c];
+        }
+        break;
+    }
+  }
+  [ms appendString:@"\""];
+}
+
+static void AppendJsonEscapedBinary(NSMutableString *ms, NSData *toEscape) {
+  [ms appendString:@"\""];
+  [ms appendString:HexEncode(toEscape)];
+  [ms appendString:@"\""];
+}
+
+)objc";
+}
+// End-MS-Specific
 
 /**
  * Generates a typedef. This is just a simple 1-liner in objective-c
@@ -434,7 +806,33 @@ void t_cocoa_generator::generate_enum(t_enum* tenum) {
 
   indent_down();
   f_header_ << endl << "};" << endl << endl;
+
+  // Begin-MS-Specific
+  if (emit_to_json_) {
+    generate_enum_name_lookup(tenum);
+  }
+  // End-MS-Specific
 }
+
+// Begin-MS-Specific
+void t_cocoa_generator::generate_enum_name_lookup(t_enum* tenum) {
+  string enumName = cocoa_prefix_ + tenum->get_name();
+  string functionName = "NameOf" + enumName;
+  string prototype = "NSString* " + functionName + "(" + enumName + " value)";
+
+  f_header_ << prototype << ";" << endl << endl;
+
+  f_impl_ << prototype << " {" << endl;
+  indent(f_impl_, 1) << "switch (value) {" << endl;
+  for (const auto& member : tenum->get_constants()) {
+    string memberName = cocoa_prefix_ + tenum->get_name() + member->get_name();
+    indent(f_impl_, 2) << "case " << memberName << ": return @\"" << member->get_name() << "\";" << endl;
+  }
+  indent(f_impl_, 2) << "default: return @\"UNKNOWN\";" << endl;
+  indent(f_impl_, 1) << "}" << endl;
+  f_impl_ << "}" << endl << endl;
+}
+// End-MS-Specific
 
 /**
  * Generates a class that holds all the constants.
@@ -586,7 +984,14 @@ void t_cocoa_generator::generate_cocoa_struct_interface(ofstream& out,
   } else {
     out << "NSObject ";
   }
-  out << "<TBase, NSCoding, NSCopying> " << endl;
+
+  // Begin-MS-Specific
+  out << "<TBase, NSCoding, NSCopying";
+  if (emit_to_json_) {
+    out << ", ThriftToJson";
+  }
+  // End-MS-Specific
+  out << ">" << endl;
 
   out << endl;
 
@@ -1009,6 +1414,12 @@ void t_cocoa_generator::generate_cocoa_struct_implementation(ofstream& out,
   generate_cocoa_struct_validator(out, tstruct);
   generate_cocoa_struct_description(out, tstruct);
 
+  // Begin-MS-Specific
+  if (emit_to_json_) {
+    generate_cocoa_struct_tojson(out, tstruct);
+  }
+  // End-MS-Specific
+
   out << "@end" << endl << endl;
 }
 
@@ -1316,6 +1727,11 @@ void t_cocoa_generator::generate_cocoa_struct_description(ofstream& out, t_struc
   vector<t_field*>::const_iterator f_iter;
   bool first = true;
   for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
+    // Begin-MS-Specific
+    string fieldName = field_name(*f_iter);
+    string isSet = fieldName + "IsSet";
+    // End-MS-Specific
+
     if (first) {
       first = false;
       indent(out) << "[ms appendString: @\"" << (*f_iter)->get_name() << ":\"];" << endl;
@@ -1323,8 +1739,22 @@ void t_cocoa_generator::generate_cocoa_struct_description(ofstream& out, t_struc
       indent(out) << "[ms appendString: @\"," << (*f_iter)->get_name() << ":\"];" << endl;
     }
     t_type* ttype = (*f_iter)->get_type();
-    indent(out) << "[ms appendFormat: @\"" << format_string_for_type(ttype) << "\", "
-                << format_cast_for_type(ttype) << "_" << (*f_iter)->get_name() << "];" << endl;
+    // Begin-MS-Specific
+    if ((*f_iter)->is_redacted()) {
+      indent(out) << "[ms appendString:@\"<REDACTED>\"];" << endl;
+    } else if ((*f_iter)->is_obfuscated()) {
+      string isReallySet = isSet;
+      if (type_can_be_null(ttype)) {
+        isReallySet += " && " + fieldName + " != nil";
+      }
+      indent(out, 1) << "if (" << isReallySet << ") {" << endl;
+      indent(out, 2) << "[ms appendString:" << obfuscate(*f_iter, fieldName) << "];" << endl;
+      indent(out, 1) << "}" << endl;
+    } else {
+      indent(out) << "[ms appendFormat: @\"" << format_string_for_type(ttype) << "\", "
+                  << format_cast_for_type(ttype) << fieldName << "];" << endl;
+    }
+    // End-MS-Specific
   }
   out << indent() << "[ms appendString: @\")\"];" << endl << indent()
       << "return [NSString stringWithString: ms];" << endl;
@@ -1332,6 +1762,265 @@ void t_cocoa_generator::generate_cocoa_struct_description(ofstream& out, t_struc
   indent_down();
   indent(out) << "}" << endl << endl;
 }
+
+// Begin-MS-Specific
+
+void t_cocoa_generator::generate_cocoa_struct_tojson(std::ostream& out, t_struct* tstruct) {
+  out << indent() << "- (void) toJson:(NSMutableString *)builder {" << endl;
+
+  indent(out, 1) << R"objc([builder appendString:@"{\"__type\": \")objc" << json(tstruct->get_name()) << "\\\"\"];" << endl;
+
+  int counter = 1;
+  for (const auto& field : tstruct->get_members()) {
+    indent(out, 1) << R"objc([builder appendString:@", \")objc" << field->get_name() << R"objc(\": "];)objc" << endl;
+    generate_cocoa_struct_tojson_method(out, field, counter, 1, false);
+  }
+
+  indent(out, 1) << R"objc([builder appendString:@"}"];)objc" << endl;
+  out << indent() << "}" << endl << endl;
+}
+
+void t_cocoa_generator::generate_cocoa_struct_tojson_method(
+    std::ostream& out,
+    t_field* field,
+    int& counter,
+    size_t levels,
+    bool is_container_element,
+    bool is_map_element) {
+
+  t_type* type = field->get_type()->get_true_type();
+
+  if (field->is_redacted()) {
+    indent(out, levels) << R"objc([builder appendString:@"\"<REDACTED>\""];)objc" << endl;
+    return;
+  }
+
+  string fieldName;
+  size_t nl; // next_level, but shorter
+  bool isObfuscated = false;
+
+  if (is_container_element) {
+    nl = levels;
+    fieldName = field->get_name();
+  } else {
+    nl = levels + 1;
+    fieldName = this->field_name(field);
+
+    // Make sure the field is set (and non-nil, if applicable).
+    // We'll just output a JSON "null" if it isn't.
+    string isSet = fieldName + "IsSet";
+    if (type_can_be_null(type)) {
+      isSet += " && " + fieldName + " != nil";
+    }
+    isObfuscated = field->is_obfuscated();
+
+    indent(out, levels) << "if (" << isSet << ") {" << endl;
+  }
+
+  if (type->is_base_type()) {
+    t_base_type* base_type = static_cast<t_base_type*>(type);
+    auto base = base_type->get_base();
+
+    if (base == t_base_type::TYPE_BOOL) {
+      string accessor = (is_container_element && !is_map_element) // NOTE: https://github.com/outlook/thrift/pull/5
+          ? "[" + fieldName + " boolValue]"
+          : fieldName;
+      if (isObfuscated) {
+        indent(out, nl) << "AppendJsonEscapedString(builder, " << obfuscate(field, accessor) << ");" << endl;
+      } else {
+        indent(out, nl) << "[builder appendString:(" << accessor << " ? @\"true\" : @\"false\")];" << endl;
+      }
+
+    } else if (base == t_base_type::TYPE_I8) {
+      string accessor = is_container_element && !is_map_element ? "[" + fieldName + " unsignedCharValue]" : fieldName;
+      if (isObfuscated) {
+        indent(out, nl) << "AppendJsonEscapedString(builder, " << obfuscate(field, accessor) << ");" << endl;
+      } else {
+        indent(out, nl) << "[builder appendFormat:@\"%2X\", " << accessor << "];" << endl;
+      }
+
+    } else if (base == t_base_type::TYPE_I16 || base == t_base_type::TYPE_I32 || base == t_base_type::TYPE_I64) {
+      string formatSpec;
+      if (is_container_element && !is_map_element) { // NOTE: https://github.com/outlook/thrift/pull/4
+        formatSpec = "@\"%@\"";
+      } else if (base == t_base_type::TYPE_I16) {
+        formatSpec = "@\"%\" PRId16";
+      } else if (base == t_base_type::TYPE_I32) {
+        formatSpec = "@\"%\" PRId32";
+      } else if (base == t_base_type::TYPE_I64) {
+        formatSpec = "@\"%\" PRId64";
+      } else {
+        throw "COMPILER ERROR: Unexpected non-container base type: " + type->get_name();
+      }
+
+      if (isObfuscated) {
+        indent(out, nl) << "AppendJsonEscapedString(builder, " << obfuscate(field, fieldName) << ");" << endl;
+      } else {
+        indent(out, nl) << "[builder appendFormat:" << formatSpec << ", " << fieldName << "];" << endl;
+      }
+
+    } else if (base == t_base_type::TYPE_DOUBLE) {
+      string formatSpec;
+      if (is_container_element) {
+        formatSpec = "@\"%@\"";
+      } else {
+        formatSpec = "@\"%f\"";
+      }
+
+      if (isObfuscated) {
+        indent(out, nl) << "AppendJsonEscapedString(builder, " << obfuscate(field, fieldName) << ");" << endl;
+      } else {
+        indent(out, nl) << "[builder appendFormat:" << formatSpec << ", " << fieldName << "];" << endl;
+      }
+
+    } else if (base == t_base_type::TYPE_STRING && base_type->is_binary()) {
+      if (isObfuscated) {
+        indent(out, nl) << "AppendJsonEscapedString(builder, " << obfuscate(field, fieldName) << ");" << endl;
+      } else {
+        indent(out, nl) << "AppendJsonEscapedBinary(builder, " << fieldName << ");" << endl;
+      }
+
+    } else if (base == t_base_type::TYPE_STRING) {
+      string accessor = isObfuscated ? obfuscate(field, fieldName) : fieldName;
+      indent(out, nl) << "AppendJsonEscapedString(builder, " << accessor << ");" << endl;
+
+    } else {
+      throw "Unexpected t_base_type::base value: " + boost::lexical_cast<string>(base);
+    }
+
+  } else if (type->is_list() || type->is_set()) {
+    if (isObfuscated) {
+      indent(out, nl) << "AppendJsonEscapedString(builder, " << obfuscate(field, fieldName) << ");" << endl;
+    } else {
+      t_type* element;
+      if (type->is_list()) {
+        element = static_cast<t_list*>(type)->get_elem_type()->get_true_type();
+      } else if (type->is_set()) {
+        element = static_cast<t_set*>(type)->get_elem_type()->get_true_type();
+      } else {
+        throw "wtf";
+      }
+
+      string elementName = element_type_name(element);
+      string firstFlag = "first_" + boost::lexical_cast<string>(counter++);
+      string iter = "elem_" + boost::lexical_cast<string>(counter++);
+
+      t_field fakeField(element, iter);
+      if (element->is_enum()) {
+        string unboxedName = unbox(element, iter);
+        fakeField = t_field{element, unboxedName};
+      }
+
+      indent(out, nl) << "[builder appendString:@\"[\"];" << endl;
+      indent(out, nl) << elementName << " " << iter << ";" << endl;
+      indent(out, nl) << "BOOL " << firstFlag << " = YES;" << endl;
+      indent(out, nl) << "for (" << iter << " in " << fieldName << ") {" << endl;
+      indent(out, nl + 1) << "if (!" << firstFlag << ") {" << endl;
+      indent(out, nl + 2) << "[builder appendString:@\", \"];" << endl;
+      indent(out, nl + 1) << "} else {" << endl;
+      indent(out, nl + 2) << firstFlag << " = NO;" << endl;
+      indent(out, nl + 1) << "}" << endl;
+
+      // Recursive call
+      generate_cocoa_struct_tojson_method(out, &fakeField, counter, nl + 1, /* is_container_element = */ true);
+
+      indent(out, nl) << "}" << endl;
+      indent(out, nl) << R"([builder appendString:@"]"];)" << endl;
+    }
+
+  } else if (type->is_map()) {
+    if (isObfuscated) {
+      indent(out, nl) << "AppendJsonEscapedString(builder, " << obfuscate(field, fieldName) << ");" << endl;
+    } else {
+      t_map* map = static_cast<t_map*>(type);
+
+      t_type* keyType = map->get_key_type()->get_true_type();
+      t_type* valType = map->get_val_type()->get_true_type();
+
+      string keyTypeName = element_type_name(keyType);
+      string valTypeName = element_type_name(valType);
+
+      string keyName = "key_" + boost::lexical_cast<string>(counter++);
+      string valName = "val_" + boost::lexical_cast<string>(counter++);
+      string firstFlag = "first_" + boost::lexical_cast<string>(counter++);
+
+      indent(out, nl) << "[builder appendString:@\"{\"];" << endl;
+      indent(out, nl) << keyTypeName << " " << keyName << ";" << endl;
+      indent(out, nl) << "BOOL " << firstFlag << " = YES;" << endl;
+      indent(out, nl) << "for (" << keyName << " in " << fieldName << ") {" << endl;
+      indent(out, nl + 1) << "if (!" << firstFlag << ") {" << endl;
+      indent(out, nl + 2) << "[builder appendString:@\", \"];" << endl;
+      indent(out, nl + 1) << "} else {" << endl;
+      indent(out, nl + 2) << firstFlag << " = NO;" << endl;
+      indent(out, nl + 1) << "}" << endl;
+
+      indent(out, nl + 1) << valTypeName << " " << valName << " = [" << fieldName << " objectForKey:" << keyName << "];" << endl;
+
+      t_field fake_key_field(keyType, keyName);
+      t_field fake_val_field(valType, unbox(valType, valName));
+
+      // HACK ATTACK
+      // This assumes keys are strings, and coerces them as such if they aren't.
+      // JSON object keys must be strings, but thrift map keys have no such constraint.
+      if (keyType->is_string()) {
+        string appendMethod;
+        if (keyType->is_binary()) {
+          appendMethod = "AppendJsonEscapedBinary";
+        } else {
+          appendMethod = "AppendJsonEscapedString";
+        }
+
+        indent(out, nl + 1) << appendMethod << "(builder, " << keyName << ");" << endl;
+      } else {
+        indent(out, nl + 1) << R"([builder appendFormat:@"\"%@\"", )" << keyName << "];" << endl;
+      }
+
+      indent(out, nl + 1) << R"([builder appendString:@": "];)" << endl;
+
+      // Recursive call
+      generate_cocoa_struct_tojson_method(
+          out,
+          &fake_val_field,
+          counter,
+          nl + 1,
+          true, // is_container_element
+          true  // is_map_element
+      );
+
+      // Close up the map
+      indent(out, nl) << "}" << endl;
+      indent(out, nl) << "[builder appendString:@\"}\"];" << endl;
+    }
+
+  } else if (type->is_enum()) {
+    if (isObfuscated) {
+      indent(out, nl) << "AppendJsonEscapedString(builder, " << obfuscate(field, fieldName) << ");" << endl;
+    } else {
+      string nameOf = "NameOf" + cocoa_prefix_ + type->get_name();
+      indent(out, nl) << R"([builder appendFormat:@"\"%@\"", )" << nameOf << "(" << fieldName << ")];" << endl;
+    }
+  } else if (type->is_struct() || type->is_xception()) {
+    if (isObfuscated) {
+      indent(out, nl) << "AppendJsonEscapedString(builder, " << obfuscate(field, fieldName) << ");" << endl;
+    } else {
+      indent(out, nl) << "[" << fieldName << " toJson:builder];" << endl;
+    }
+  } else if (type->is_service()) {
+    throw "Cannot JSONify a service";
+  } else if (type->is_typedef()) {
+    throw "generating toJson: typedefs should have been resolved by now";
+  } else {
+    throw "Neither fish nor fowl: " + type->get_name();
+  }
+
+  if (!is_container_element) {
+    indent(out, levels) << "} else {" << endl;
+    indent(out, levels + 1) << "[builder appendString:@\"null\"];" << endl;
+    indent(out, levels) << "}" << endl;
+  }
+}
+
+// End-MS-Specific
 
 /**
  * Generates a thrift service.  In Objective-C this consists of a
@@ -2345,6 +3034,10 @@ string t_cocoa_generator::unbox(t_type* ttype, string field_name) {
   return field_name;
 }
 
+string t_cocoa_generator::field_name(t_field* field) {
+  return "_" + field->get_name();
+}
+
 /**
  * Generates code to deserialize a map element
  */
@@ -2733,7 +3426,7 @@ void t_cocoa_generator::print_const_value(ostream& out,
     indent(out);
     const vector<t_field*>& fields = ((t_struct*)type)->get_members();
     vector<t_field*>::const_iterator f_iter;
-    const map<t_const_value*, t_const_value*>& val = value->get_map();
+    auto val = value->get_map();
     map<t_const_value*, t_const_value*>::const_iterator v_iter;
     if (defval)
       out << type_name(type) << " ";
@@ -2758,11 +3451,11 @@ void t_cocoa_generator::print_const_value(ostream& out,
     indent(mapout);
     t_type* ktype = ((t_map*)type)->get_key_type();
     t_type* vtype = ((t_map*)type)->get_val_type();
-    const map<t_const_value*, t_const_value*>& val = value->get_map();
+    auto val = value->get_map();
     map<t_const_value*, t_const_value*>::const_iterator v_iter;
     if (defval)
       mapout << type_name(type) << " ";
-    mapout << name << " = @{";
+    mapout << name << " = [NSMutableDictionary dictionaryWithDictionary:@{";
     for (v_iter = val.begin(); v_iter != val.end();) {
       mapout << render_const_value(out, ktype, v_iter->first, true) << ": "
           << render_const_value(out, vtype, v_iter->second, true);
@@ -2770,8 +3463,11 @@ void t_cocoa_generator::print_const_value(ostream& out,
         mapout << ", ";
       }
     }
-    mapout << "}";
+    mapout << "}]";
     out << mapout.str();
+    if (!defval) {
+      out << ";" << endl;
+    }
   } else if (type->is_list()) {
     ostringstream listout;
     indent(listout);
@@ -2780,15 +3476,18 @@ void t_cocoa_generator::print_const_value(ostream& out,
     vector<t_const_value*>::const_iterator v_iter;
     if (defval)
       listout << type_name(type) << " ";
-    listout << name << " = @[";
+    listout << name << " = [NSMutableArray arrayWithArray:@[";
     for (v_iter = val.begin(); v_iter != val.end();) {
       listout << render_const_value(out, etype, *v_iter, true);
       if (++v_iter != val.end()) {
         listout << ", ";
       }
     }
-    listout << "]";
+    listout << "]]";
     out << listout.str();
+    if (!defval) {
+      out << ";" << endl;
+    }
   } else if (type->is_set()) {
     ostringstream setout;
     indent(setout);
@@ -2797,7 +3496,7 @@ void t_cocoa_generator::print_const_value(ostream& out,
     vector<t_const_value*>::const_iterator v_iter;
     if (defval)
       setout << type_name(type) << " ";
-    setout << name << " = [NSSet setWithArray:@[";
+    setout << name << " = [NSMutableSet setWithArray:@[";
     for (v_iter = val.begin(); v_iter != val.end();) {
       setout << render_const_value(out, etype, *v_iter, true);
       if (++v_iter != val.end()) {
@@ -2806,6 +3505,9 @@ void t_cocoa_generator::print_const_value(ostream& out,
     }
     setout << "]]";
     out << setout.str();
+    if (!defval) {
+      out << ";" << endl;
+    }
   } else {
     throw "compiler error: no const of type " + type->get_name();
   }
@@ -3040,7 +3742,9 @@ string t_cocoa_generator::declare_property(t_field* tfield) {
  * @param tfield The field to declare a property for
  */
 string t_cocoa_generator::declare_property_isset(t_field* tfield) {
-  return "@property (assign, nonatomic) BOOL " + decapitalize(tfield->get_name()) + "IsSet;";
+  // Begin-MS-Specific (originally, this was 'capitalize(tfield->get_name())', but that seemed buggy)
+  return "@property (assign, nonatomic) BOOL " + tfield->get_name() + "IsSet;";
+  // End-MS-Specific
 }
 
 /**

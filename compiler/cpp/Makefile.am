@@ -52,22 +52,31 @@ compiler_core =  src/thrift/common.h \
                  src/thrift/parse/t_doc.h \
                  src/thrift/parse/t_type.h \
                  src/thrift/parse/t_base_type.h \
+                 src/thrift/parse/t_base_type.cc \
                  src/thrift/parse/t_enum.h \
+                 src/thrift/parse/t_enum.cc \
                  src/thrift/parse/t_enum_value.h \
                  src/thrift/parse/t_typedef.h \
                  src/thrift/parse/t_typedef.cc \
                  src/thrift/parse/t_container.h \
                  src/thrift/parse/t_list.h \
+                 src/thrift/parse/t_list.cc \
                  src/thrift/parse/t_set.h \
+                 src/thrift/parse/t_set.cc \
                  src/thrift/parse/t_map.h \
+                 src/thrift/parse/t_map.cc \
                  src/thrift/parse/t_struct.h \
+                 src/thrift/parse/t_struct.cc \
                  src/thrift/parse/t_field.h \
+                 src/thrift/parse/t_field.cc \
                  src/thrift/parse/t_service.h \
+                 src/thrift/parse/t_service.cc \
                  src/thrift/parse/t_function.h \
                  src/thrift/parse/t_program.h \
                  src/thrift/parse/t_scope.h \
                  src/thrift/parse/t_const.h \
                  src/thrift/parse/t_const_value.h \
+                 src/thrift/parse/t_visitor.h \
                  src/thrift/parse/parse.cc \
                  src/thrift/generate/t_generator.h \
                  src/thrift/generate/t_oop_generator.h \
@@ -173,7 +182,8 @@ include_parse_HEADERS = src/thrift/parse/t_service.h \
                         src/thrift/parse/t_function.h \
                         src/thrift/parse/t_type.h \
                         src/thrift/parse/t_doc.h \
-                        src/thrift/parse/t_struct.h
+                        src/thrift/parse/t_struct.h \
+                        src/thrift/parse/t_visitor.h
 
 include_plugindir = $(include_thriftdir)/plugin
 include_plugin_HEADERS = src/thrift/plugin/plugin.h \

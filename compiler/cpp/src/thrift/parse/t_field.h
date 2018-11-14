@@ -24,6 +24,7 @@
 #include <string>
 #include <sstream>
 
+#include "thrift/parse/t_const_value.h"
 #include "thrift/parse/t_doc.h"
 #include "thrift/parse/t_type.h"
 
@@ -108,6 +109,37 @@ public:
   bool get_reference() { return reference_; }
 
   void set_reference(bool reference) { reference_ = reference; }
+
+  /**
+   * True if this field's value is to be redacted when printed.
+   */
+  bool is_redacted() const;
+
+  /**
+   * True if this field's value is to be obfuscated when printed.
+   *
+   * Obfuscation typically preserves "some" information about the
+   * value, in contrast with redaction which preserves no information
+   * at all.
+   *
+   * For example, printing an obfuscated field might yield a hash
+   * of the value.  The precise nature of obfuscation is left to
+   * individual code generators.
+   */
+  bool is_obfuscated() const;
+
+private:
+  /**
+   * Performs a case-insensitive search of this field's documentation
+   * for the given @c text.
+   */
+  bool has_doc_text(const std::string& text) const;
+
+  /**
+   * Returns true if this field is annotated with the given annotation
+   * name, regardless of the annotation's value.
+   */
+  bool has_anno(const std::string& anno) const;
 
 private:
   t_type* type_;

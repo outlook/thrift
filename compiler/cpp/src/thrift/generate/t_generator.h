@@ -178,7 +178,7 @@ protected:
   int indent_count() { return indent_; }
 
   void indent_validate( int expected, const char * func_name) {
-    if (indent_ != expected) { 
+    if (indent_ != expected) {
       pverbose("Wrong indent count in %s: difference = %i \n", func_name, (expected - indent_));
     }
   }
@@ -200,6 +200,13 @@ protected:
    * Indentation utility wrapper
    */
   std::ostream& indent(std::ostream& os) { return os << indent(); }
+
+  std::ostream& indent(std::ostream& os, size_t times) {
+    for (size_t i = 0; i < times; ++i) {
+      os << indent_str();
+    }
+    return os;
+  }
 
   /**
    * Capitalization helpers
