@@ -428,6 +428,7 @@ public:
   std::string field_name(t_field* field);
   std::string getter_name(string field_name);
   std::string setter_name(string field_name);
+  std::string enum_name_getter_name(t_type* tenum);
 
   bool type_can_be_null(t_type* ttype) {
     ttype = get_true_type(ttype);
@@ -817,8 +818,7 @@ void t_cocoa_generator::generate_enum(t_enum* tenum) {
 // Begin-MS-Specific
 void t_cocoa_generator::generate_enum_name_lookup(t_enum* tenum) {
   string enumName = cocoa_prefix_ + tenum->get_name();
-  string functionName = "NameOf" + enumName;
-  string prototype = "NSString* " + functionName + "(" + enumName + " value)";
+  string prototype = "NSString* " + enum_name_getter_name(tenum) + "(" + enumName + " value)";
 
   f_header_ << prototype << ";" << endl << endl;
 
@@ -1971,6 +1971,8 @@ void t_cocoa_generator::generate_cocoa_struct_tojson_method(
         }
 
         indent(out, nl + 1) << appendMethod << "(builder, " << keyName << ");" << endl;
+      } else if (keyType->is_enum()) {
+        indent(out, nl + 1) << R"([builder appendFormat:@"\"%@\"", )" << enum_name_getter_name(keyType) << "(" << keyName << ")];" << endl;
       } else {
         indent(out, nl + 1) << R"([builder appendFormat:@"\"%@\"", )" << keyName << "];" << endl;
       }
@@ -1996,8 +1998,7 @@ void t_cocoa_generator::generate_cocoa_struct_tojson_method(
     if (isObfuscated) {
       indent(out, nl) << "AppendJsonEscapedString(builder, " << obfuscate(field, fieldName) << ");" << endl;
     } else {
-      string nameOf = "NameOf" + cocoa_prefix_ + type->get_name();
-      indent(out, nl) << R"([builder appendFormat:@"\"%@\"", )" << nameOf << "(" << fieldName << ")];" << endl;
+      indent(out, nl) << R"([builder appendFormat:@"\"%@\"", )" << enum_name_getter_name(type) << "(" << fieldName << ")];" << endl;
     }
   } else if (type->is_struct() || type->is_xception()) {
     if (isObfuscated) {
@@ -3036,6 +3037,10 @@ string t_cocoa_generator::unbox(t_type* ttype, string field_name) {
 
 string t_cocoa_generator::field_name(t_field* field) {
   return "_" + field->get_name();
+}
+
+string t_cocoa_generator::enum_name_getter_name(t_type* tenum) {
+  return "NameOf" + cocoa_prefix_ + tenum->get_name();
 }
 
 /**
