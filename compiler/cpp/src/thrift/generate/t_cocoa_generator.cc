@@ -1972,7 +1972,7 @@ void t_cocoa_generator::generate_cocoa_struct_tojson_method(
 
         indent(out, nl + 1) << appendMethod << "(builder, " << keyName << ");" << endl;
       } else if (keyType->is_enum()) {
-        indent(out, nl + 1) << R"([builder appendFormat:@"\"%@\"", )" << enum_name_getter_name(keyType) << "(" << keyName << ")];" << endl;
+        indent(out, nl + 1) << R"([builder appendFormat:@"\"%@\"", )" << enum_name_getter_name(keyType) << "([" << keyName << " intValue])];" << endl;
       } else {
         indent(out, nl + 1) << R"([builder appendFormat:@"\"%@\"", )" << keyName << "];" << endl;
       }
