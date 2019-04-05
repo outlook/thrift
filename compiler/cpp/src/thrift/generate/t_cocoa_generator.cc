@@ -32,6 +32,7 @@
 #include "thrift/generate/t_oop_generator.h"
 // Begin-MS-Specific
 #include "thrift/parse/t_visitor.h"
+#include <boost/algorithm/string/replace.hpp>
 // End-MS-Specific
 
 using std::map;
@@ -3041,8 +3042,23 @@ string t_cocoa_generator::field_name(t_field* field) {
 }
 
 string t_cocoa_generator::enum_value_name(t_enum* tenum, t_enum_value* tenumvalue) {
+  // Convert to camel case
   std::string cap_value_name = tenumvalue->get_name();
   cap_value_name[0] = toupper(cap_value_name[0]);
+
+  // Underscores separate words
+  bool cap_next = false;
+  for (string::iterator iter = cap_value_name.begin(); iter < cap_value_name.end(); iter++) {
+    if (cap_next) {
+        *iter = toupper(*iter);
+        cap_next = false;
+    }
+    else if (*iter == '_') {
+        cap_next = true;
+    }
+  }
+
+  boost::replace_all(cap_value_name, "_", "");
 
   return cocoa_prefix_ + tenum->get_name() + cap_value_name;
 }
