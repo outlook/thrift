@@ -32,6 +32,7 @@
 #include "thrift/generate/t_oop_generator.h"
 // Begin-MS-Specific
 #include "thrift/parse/t_visitor.h"
+#include <boost/algorithm/string/replace.hpp>
 // End-MS-Specific
 
 using std::map;
@@ -428,6 +429,7 @@ public:
   std::string field_name(t_field* field);
   std::string getter_name(string field_name);
   std::string setter_name(string field_name);
+  std::string enum_value_name(t_enum* tenum, t_enum_value* tenumvalue);
   std::string enum_name_getter_name(t_type* tenum);
 
   bool type_can_be_null(t_type* ttype) {
@@ -801,7 +803,8 @@ void t_cocoa_generator::generate_enum(t_enum* tenum) {
     } else {
       f_header_ << "," << endl;
     }
-    f_header_ << indent() << cocoa_prefix_ << tenum->get_name() << (*c_iter)->get_name();
+
+    f_header_ << indent() << enum_value_name(tenum, (*c_iter));
     f_header_ << " = " << (*c_iter)->get_value();
   }
 
@@ -824,9 +827,8 @@ void t_cocoa_generator::generate_enum_name_lookup(t_enum* tenum) {
 
   f_impl_ << prototype << " {" << endl;
   indent(f_impl_, 1) << "switch (value) {" << endl;
-  for (const auto& member : tenum->get_constants()) {
-    string memberName = cocoa_prefix_ + tenum->get_name() + member->get_name();
-    indent(f_impl_, 2) << "case " << memberName << ": return @\"" << member->get_name() << "\";" << endl;
+  for (const auto& value : tenum->get_constants()) {
+    indent(f_impl_, 2) << "case " << enum_value_name(tenum, value) << ": return @\"" << value->get_name() << "\";" << endl;
   }
   indent(f_impl_, 2) << "default: return @\"UNKNOWN\";" << endl;
   indent(f_impl_, 1) << "}" << endl;
@@ -3037,6 +3039,28 @@ string t_cocoa_generator::unbox(t_type* ttype, string field_name) {
 
 string t_cocoa_generator::field_name(t_field* field) {
   return "_" + field->get_name();
+}
+
+string t_cocoa_generator::enum_value_name(t_enum* tenum, t_enum_value* tenumvalue) {
+  // Convert to camel case
+  std::string cap_value_name = tenumvalue->get_name();
+  cap_value_name[0] = toupper(cap_value_name[0]);
+
+  // Underscores separate words
+  bool cap_next = false;
+  for (string::iterator iter = cap_value_name.begin(); iter < cap_value_name.end(); iter++) {
+    if (cap_next) {
+        *iter = toupper(*iter);
+        cap_next = false;
+    }
+    else if (*iter == '_') {
+        cap_next = true;
+    }
+  }
+
+  boost::replace_all(cap_value_name, "_", "");
+
+  return cocoa_prefix_ + tenum->get_name() + cap_value_name;
 }
 
 string t_cocoa_generator::enum_name_getter_name(t_type* tenum) {
