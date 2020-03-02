@@ -183,7 +183,6 @@ public:
   string base_type_name(t_base_type* tbase);
   string declare_property(t_field* tfield, bool is_private);
   string function_signature(t_function* tfunction);
-  string render_const_value(t_type* type, t_const_value* value);
   string async_function_signature(t_function* tfunction);
   string promise_function_signature(t_function* tfunction);
   string function_name(t_function* tfunction);
@@ -2145,7 +2144,8 @@ string t_swift_generator::declare_property(t_field* tfield, bool is_private) {
 
   if (tfield->get_value() != NULL) {
     t_type* type = tfield->get_type();
-    render << " = " << render_const_value(type, tfield->get_value());
+    render << " = ";
+    render_const_value(render, type, tfield->get_value());
   }
   else {
     if (field_is_optional(tfield)) {
@@ -2154,44 +2154,6 @@ string t_swift_generator::declare_property(t_field* tfield, bool is_private) {
     else {
       render << " = " << type_name(tfield->get_type(), false) << "()";
     }
-  }
-
-  return render.str();
-}
-
-string t_swift_generator::render_const_value(t_type* type, t_const_value* value) {
-  type = get_true_type(type);
-  std::ostringstream render;
-
-  if (type->is_base_type()) {
-    t_base_type::t_base tbase = ((t_base_type*)type)->get_base();
-    switch (tbase) {
-    case t_base_type::TYPE_STRING:
-      render << "\"" + get_escaped_string(value) + "\"";
-      break;
-    case t_base_type::TYPE_BOOL:
-      render << ((value->get_integer() > 0) ? "true" : "false");
-      break;
-    case t_base_type::TYPE_I8:
-    case t_base_type::TYPE_I16:
-    case t_base_type::TYPE_I32:
-    case t_base_type::TYPE_I64:
-      render << value->get_integer();
-      break;
-    case t_base_type::TYPE_DOUBLE:
-      if (value->get_type() == t_const_value::CV_INTEGER) {
-        render << value->get_integer();
-      } else {
-        render << value->get_double();
-      }
-      break;
-    default:
-      throw "compiler error: no const of base type " + t_base_type::t_base_name(tbase);
-    }
-  } else if (type->is_enum()) {
-    render << value->get_identifier();
-  } else {
-    throw "compiler error: unsupported default type " + type->get_name();
   }
 
   return render.str();
