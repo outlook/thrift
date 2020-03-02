@@ -28,6 +28,8 @@
 #include <sstream>
 #include "thrift/platform.h"
 #include "thrift/generate/t_oop_generator.h"
+#include <boost/algorithm/string/replace.hpp>
+#include <boost/algorithm/string/predicate.hpp>
 
 using std::map;
 using std::ostream;
@@ -70,6 +72,8 @@ public:
         debug_descriptions_ = true;
       } else if( iter->first.compare("exclude_thrift_types") == 0) {
 	exclude_thrift_types_ = true;
+      } else if( iter->first.compare("telemetry_object") == 0) {
+	telemetry_object_ = true;
       }
       else {
         throw "unknown option swift:" + iter->first;
@@ -171,6 +175,7 @@ public:
    * Helper rendering functions
    */
 
+  string telemetry_object_protocols();
   string swift_imports();
   string swift_thrift_imports();
   string type_name(t_type* ttype, bool is_optional=false, bool is_forced=false);
@@ -184,6 +189,7 @@ public:
   string type_to_enum(t_type* ttype, bool qualified=false);
   string maybe_escape_identifier(const string& identifier);
   void populate_reserved_words();
+  string enum_value_name(t_enum_value* tenumvalue);
 
 private:
 
@@ -239,6 +245,7 @@ private:
   bool promise_kit_;
   bool debug_descriptions_;
   bool exclude_thrift_types_;
+  bool telemetry_object_;
 
   set<string> swift_reserved_words_;
 };
@@ -271,6 +278,29 @@ void t_swift_generator::init_generator() {
 
   f_impl_ << swift_imports() << swift_thrift_imports() << endl;
 
+  if (telemetry_object_) {
+    f_impl_ << telemetry_object_protocols() << endl << endl;
+  }
+}
+
+/**
+ * Prints protocols necessary for telemetry objects
+ *
+ * @return Protocols for telemetry objects
+ */
+string t_swift_generator::telemetry_object_protocols() {
+  return R"objc(
+public typealias TelemetryDictionary = [String: TelemetryValue]
+
+public protocol TelemetryObject {
+  func telemetryValue() -> TelemetryDictionary
+}
+
+public enum TelemetryValue {
+  case string(String)
+  case bool(Bool)
+  case object(TelemetryDictionary)
+})objc";
 }
 
 /**
@@ -358,7 +388,7 @@ void t_swift_generator::generate_enum(t_enum* tenum) {
   vector<t_enum_value*>::iterator c_iter;
 
   for (c_iter = constants.begin(); c_iter != constants.end(); ++c_iter) {
-    f_decl_ << indent() << "case " << (*c_iter)->get_name()
+    f_decl_ << indent() << "case " << enum_value_name(*c_iter)
             << " = " << (*c_iter)->get_value() << endl;
   }
 
@@ -390,6 +420,22 @@ void t_swift_generator::generate_enum(t_enum* tenum) {
     f_impl_ << indent() << "try proto.writeI32(value.rawValue)" << endl;
     block_close(f_impl_);
     f_impl_ << endl;
+  }
+
+  if (telemetry_object_) {
+    f_impl_ << indent() << "public func telemetryValue() -> TelemetryValue";
+    block_open(f_impl_);
+    if (boost::algorithm::ends_with(tenum->get_name(), "AsInt")) {
+      f_impl_ << indent() << "return .string(\"\\(rawValue)\")" << endl;
+    }
+    else {
+      f_impl_ << indent() << "switch self {" << endl;
+      for (const auto& value : tenum->get_constants()) {
+        f_impl_ << indent() << "case ." << enum_value_name(value) << ": return .string(\"" << value->get_name() << "\")" << endl;
+      }
+      f_impl_ << indent() << "}" << endl;
+    }
+    block_close(f_impl_);
   }
 
   block_close(f_impl_);
@@ -2167,6 +2213,11 @@ void t_swift_generator::populate_reserved_words() {
   swift_reserved_words_.insert("true");
   swift_reserved_words_.insert("typealias");
   swift_reserved_words_.insert("where");
+}
+
+string t_swift_generator::enum_value_name(t_enum_value* tenumvalue) {
+  // TODO: Camel-case
+  return tenumvalue->get_name();
 }
 
 string t_swift_generator::maybe_escape_identifier(const string& identifier) {
