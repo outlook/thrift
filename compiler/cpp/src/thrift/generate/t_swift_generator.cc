@@ -193,6 +193,7 @@ public:
   void populate_reserved_words();
   string enum_value_name(t_enum_value* tenumvalue);
   string struct_property_name(t_field* field);
+  string camel_case_from_underscore(string underscore_name);
 
 private:
 
@@ -594,7 +595,7 @@ void t_swift_generator::generate_swift_struct_init(ofstream& out,
       else {
         out << ", ";
       }
-      out << (*m_iter)->get_name() << ": "
+      out << struct_property_name(*m_iter) << ": "
           << maybe_escape_identifier(type_name((*m_iter)->get_type(), field_is_optional(*m_iter)));
     }
     ++m_iter;
@@ -605,8 +606,8 @@ void t_swift_generator::generate_swift_struct_init(ofstream& out,
 
   for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
     if (all || (*m_iter)->get_req() == t_field::T_REQUIRED || (*m_iter)->get_req() == t_field::T_OPT_IN_REQ_OUT) {
-      out << indent() << "self." << maybe_escape_identifier((*m_iter)->get_name()) << " = "
-          << maybe_escape_identifier((*m_iter)->get_name()) << endl;
+      out << indent() << "self." << maybe_escape_identifier(struct_property_name(*m_iter)) << " = "
+          << maybe_escape_identifier(struct_property_name(*m_iter)) << endl;
     }
   }
 
@@ -699,8 +700,8 @@ void t_swift_generator::generate_swift_struct_equatable_extension(ofstream& out,
 
     for (m_iter = members.begin(); m_iter != members.end();) {
       t_field* tfield = *m_iter;
-      indent(out) << "(lhs." << maybe_escape_identifier(tfield->get_name())
-                  << " ?== rhs." << maybe_escape_identifier(tfield->get_name()) << ")";
+      indent(out) << "(lhs." << maybe_escape_identifier(struct_property_name(tfield))
+                  << " ?== rhs." << maybe_escape_identifier(struct_property_name(tfield)) << ")";
       if (++m_iter != members.end()) {
         out << " &&";
       }
@@ -1076,7 +1077,7 @@ void t_swift_generator::generate_swift_struct_printable_extension(ofstream& out,
   vector<t_field*>::const_iterator f_iter;
 
   for (f_iter = fields.begin(); f_iter != fields.end();) {
-    indent(out) << "desc += \"" << (*f_iter)->get_name()
+    indent(out) << "desc += \"" << struct_property_name(*f_iter)
                 << "=\\(self." << maybe_escape_identifier(struct_property_name(*f_iter)) << ")";
     if (++f_iter != fields.end()) {
       out << ", ";
@@ -2326,13 +2327,33 @@ void t_swift_generator::populate_reserved_words() {
 }
 
 string t_swift_generator::struct_property_name(t_field* tfield) {
-  // TODO: Camel-case
-  return tfield->get_name();
+  return camel_case_from_underscore(tfield->get_name());
 }
 
 string t_swift_generator::enum_value_name(t_enum_value* tenumvalue) {
-  // TODO: Camel-case
-  return tenumvalue->get_name();
+  return camel_case_from_underscore(tenumvalue->get_name());
+}
+ 
+string t_swift_generator::camel_case_from_underscore(string underscore_name) {
+  // Convert to camel case
+  std::string cap_value_name = underscore_name;
+  cap_value_name[0] = tolower(underscore_name[0]);
+
+  // Underscores separate words
+  bool cap_next = false;
+  for (string::iterator iter = cap_value_name.begin(); iter < cap_value_name.end(); iter++) {
+    if (cap_next) {
+      *iter = toupper(*iter);
+      cap_next = false;
+    }
+    else if (*iter == '_') {
+      cap_next = true;
+    }
+  }
+
+  boost::replace_all(cap_value_name, "_", "");
+
+  return cap_value_name;
 }
 
 string t_swift_generator::maybe_escape_identifier(const string& identifier) {
