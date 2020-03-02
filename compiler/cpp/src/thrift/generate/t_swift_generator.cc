@@ -130,6 +130,7 @@ public:
   void generate_swift_struct_equatable_extension(ofstream& out,
                                                  t_struct* tstruct,
                                                  bool is_private);
+  void generate_swift_struct_telemetry_object_extension(ofstream& out, t_struct* tstruct);
   void generate_swift_struct_thrift_extension(ofstream& out,
                                               t_struct* tstruct,
                                               bool is_result,
@@ -190,6 +191,7 @@ public:
   string maybe_escape_identifier(const string& identifier);
   void populate_reserved_words();
   string enum_value_name(t_enum_value* tenumvalue);
+  string struct_property_name(t_field* field);
 
 private:
 
@@ -293,14 +295,32 @@ string t_swift_generator::telemetry_object_protocols() {
 public typealias TelemetryDictionary = [String: TelemetryValue]
 
 public protocol TelemetryObject {
-  func telemetryValue() -> TelemetryDictionary
+  func telemetryDictionary() -> TelemetryDictionary
 }
 
 public enum TelemetryValue {
   case string(String)
   case bool(Bool)
-  case object(TelemetryDictionary)
-})objc";
+  case dictionary(TelemetryDictionary)
+
+  init(_ value: Any) {
+    if let string = value as? String {
+      return .string(string)
+    }
+    else if let bool = value as? Bool {
+      return .bool(bool)
+    }
+    else if let telemetryObject = value as? TelemetryObject {
+      return .dictionary(value.telemetryDictionary())
+    }
+    else {
+      // Convert other types to string
+      return .string("\(value)")
+    }
+  }
+}
+
+)objc";
 }
 
 /**
@@ -629,7 +649,7 @@ void t_swift_generator::generate_swift_struct_hashable_extension(ofstream& out,
       t_field* tfield = *m_iter;
       string accessor = field_is_optional(tfield) ? "?." : ".";
       string defaultor = field_is_optional(tfield) ? " ?? 0" : "";
-      indent(out) << "result = prime &* result &+ (" << maybe_escape_identifier(tfield->get_name()) << accessor
+      indent(out) << "result = prime &* result &+ (" << maybe_escape_identifier(struct_property_name(tfield)) << accessor
                   <<  "hashValue" << defaultor << ")" << endl;
     }
 
@@ -720,9 +740,60 @@ void t_swift_generator::generate_swift_struct_implementation(ofstream& out,
   }
 
   generate_swift_struct_hashable_extension(out, tstruct, is_private);
-  generate_swift_struct_thrift_extension(out, tstruct, is_result, is_private);
-
+  if (!exclude_thrift_types_) {
+    generate_swift_struct_thrift_extension(out, tstruct, is_result, is_private);
+  }
+  if (telemetry_object_) {
+    generate_swift_struct_telemetry_object_extension(out, tstruct);
+  }
   out << endl << endl;
+}
+
+/**
+ * Generate the TelemetryObject protocol implementation
+ *
+ * @param tstruct The structure definition
+ */
+void t_swift_generator::generate_swift_struct_telemetry_object_extension(ofstream& out, t_struct* tstruct) {
+  indent(out) << "extension " << tstruct->get_name() << " : TelemetryObject";
+  block_open(out);
+
+  out << endl;
+
+  out << indent() << "public func telemetryDictionary() -> TelemetryDictionary";
+  block_open(out);
+ 
+  out << endl;
+
+  out << indent() << "var telemetryData = TelemetryDictionary()" << endl;
+
+  for (const auto& member : tstruct->get_members()) {
+    bool optional = field_is_optional(member);
+    if (optional) {
+      out << indent() << "if let " << struct_property_name(member) << " = " << struct_property_name(member);
+      block_open(out);
+    }
+
+    out << indent() << "telemetryData[\"" << member->get_name() << "\"] = ";
+    if (member->get_type()->is_enum()) {
+      out << struct_property_name(member) << ".telemetryValue()";
+    }
+    else {
+      out << "TelemetryValue(" << struct_property_name(member) << ")";
+    }
+    out << endl;
+
+    if (optional) {
+      block_close(out);
+    }
+  }
+
+  out << indent() << "return telemetryData" << endl;
+  
+  block_close(out);
+  block_close(out);
+
+  out << endl;
 }
 
 /**
@@ -739,24 +810,18 @@ void t_swift_generator::generate_swift_struct_thrift_extension(ofstream& out,
                                                                bool is_result,
                                                                bool is_private) {
 
-  indent(out) << "extension " << tstruct->get_name();
-  if (!exclude_thrift_types_) {
-    out << " : TStruct";
-  }
-
+  indent(out) << "extension " << tstruct->get_name() << " : TStruct";
   block_open(out);
 
   out << endl;
 
-  if (!exclude_thrift_types_) {
-    generate_swift_struct_reader(out, tstruct, is_private);
+  generate_swift_struct_reader(out, tstruct, is_private);
 
-    if (is_result) {
-      generate_swift_struct_result_writer(out, tstruct);
-    }
-    else {
-      generate_swift_struct_writer(out, tstruct, is_private);
-    }
+  if (is_result) {
+    generate_swift_struct_result_writer(out, tstruct);
+  }
+  else {
+    generate_swift_struct_writer(out, tstruct, is_private);
   }
 
   block_close(out);
@@ -792,7 +857,7 @@ void t_swift_generator::generate_swift_struct_reader(ofstream& out,
 
   for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
     bool optional = field_is_optional(*f_iter);
-    indent(out) << "var " << maybe_escape_identifier((*f_iter)->get_name()) << " : "
+    indent(out) << "var " << maybe_escape_identifier(struct_property_name(*f_iter)) << " : "
                 << type_name((*f_iter)->get_type(), optional, !optional) << endl;
   }
 
@@ -908,8 +973,8 @@ void t_swift_generator::generate_swift_struct_writer(ofstream& out,
 
     bool optional = field_is_optional(tfield);
     if (optional) {
-      indent(out) << "if let " << maybe_escape_identifier(tfield->get_name())
-                  << " = __value." << maybe_escape_identifier(tfield->get_name());
+      indent(out) << "if let " << maybe_escape_identifier(struct_property_name(tfield))
+                  << " = __value." << maybe_escape_identifier(struct_property_name(tfield));
       block_open(out);
     }
 
@@ -963,7 +1028,7 @@ void t_swift_generator::generate_swift_struct_result_writer(ofstream& out, t_str
   for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
     t_field *tfield = *f_iter;
 
-    indent(out) << "if let result = __value." << (*f_iter)->get_name();
+    indent(out) << "if let result = __value." << struct_property_name(*f_iter);
 
     block_open(out);
 
@@ -1011,7 +1076,7 @@ void t_swift_generator::generate_swift_struct_printable_extension(ofstream& out,
 
   for (f_iter = fields.begin(); f_iter != fields.end();) {
     indent(out) << "desc += \"" << (*f_iter)->get_name()
-                << "=\\(self." << maybe_escape_identifier((*f_iter)->get_name()) << ")";
+                << "=\\(self." << maybe_escape_identifier(struct_property_name(*f_iter)) << ")";
     if (++f_iter != fields.end()) {
       out << ", ";
     }
@@ -1352,7 +1417,7 @@ void t_swift_generator::generate_swift_service_client_send_function_implementati
 
   for (f_iter = fields.begin(); f_iter != fields.end();) {
     t_field *tfield = (*f_iter);
-    out << tfield->get_name() << ": " << tfield->get_name();
+    out << struct_property_name(tfield) << ": " << struct_property_name(tfield);
     if (++f_iter != fields.end()) {
       out << ", ";
     }
@@ -1425,9 +1490,9 @@ void t_swift_generator::generate_swift_service_client_recv_function_implementati
   vector<t_field*>::const_iterator x_iter;
 
   for (x_iter = xceptions.begin(); x_iter != xceptions.end(); ++x_iter) {
-    indent(out) << "if let " << (*x_iter)->get_name() << " = __result." << (*x_iter)->get_name();
+    indent(out) << "if let " << struct_property_name(*x_iter) << " = __result." << struct_property_name(*x_iter);
     block_open(out);
-    indent(out) << "throw " << (*x_iter)->get_name() << endl;
+    indent(out) << "throw " << struct_property_name(*x_iter) << endl;
     block_close(out);
   }
 
@@ -1464,7 +1529,7 @@ void t_swift_generator::generate_swift_service_client_send_function_invocation(o
   vector<t_field*>::const_iterator f_iter;
 
   for (f_iter = fields.begin(); f_iter != fields.end();) {
-    out << (*f_iter)->get_name() << ": " << (*f_iter)->get_name();
+    out << (*f_iter)->get_name() << ": " << struct_property_name(*f_iter);
     if (++f_iter != fields.end()) {
       out << ", ";
     }
@@ -1489,7 +1554,7 @@ void t_swift_generator::generate_swift_service_client_send_async_function_invoca
   indent(out) << "try send_" << tfunction->get_name() << "(__protocol";
 
   for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
-    out << ", " << (*f_iter)->get_name() << ": " << (*f_iter)->get_name();
+    out << ", " << struct_property_name(*f_iter) << ": " << struct_property_name(*f_iter);
   }
 
   out << ")" << endl;
@@ -1758,7 +1823,7 @@ void t_swift_generator::generate_swift_service_server_implementation(ofstream& o
       vector<t_field*>::const_iterator f_iter;
 
       for (f_iter = fields.begin(); f_iter != fields.end();) {
-        string fieldName = (*f_iter)->get_name();
+        string fieldName = struct_property_name(*f_iter);
         if (f_iter != fields.begin()) {
           out << fieldName << ": ";
         }
@@ -1779,7 +1844,7 @@ void t_swift_generator::generate_swift_service_server_implementation(ofstream& o
       for (x_iter = xfields.begin(); x_iter != xfields.end(); ++x_iter) {
         indent(out) << "catch let error as " << (*x_iter)->get_type()->get_name();
         block_open(out);
-        indent(out) << "result." << (*x_iter)->get_name() << " = error" << endl;
+        indent(out) << "result." << struct_property_name(*x_iter) << " = error" << endl;
         block_close(out);
       }
 
@@ -1974,7 +2039,7 @@ void t_swift_generator::render_const_value(ostream& out,
       t_field* tfield = *f_iter;
       t_const_value* value = NULL;
       for (v_iter = val.begin(); v_iter != val.end(); ++v_iter) {
-        if (tfield->get_name() == v_iter->first->get_string()) {
+        if (struct_property_name(tfield) == v_iter->first->get_string()) {
           value = v_iter->second;
         }
       }
@@ -2074,7 +2139,7 @@ string t_swift_generator::declare_property(t_field* tfield, bool is_private) {
 
   ostringstream render;
 
-  render << visibility << " var " << maybe_escape_identifier(tfield->get_name());
+  render << visibility << " var " << maybe_escape_identifier(struct_property_name(tfield));
 
   if (field_is_optional(tfield)) {
     render << " : " << type_name(tfield->get_type(), true);
@@ -2173,7 +2238,7 @@ string t_swift_generator::argument_list(t_struct* tstruct, string protocol_name,
 
   for (f_iter = fields.begin(); f_iter != fields.end();) {
     t_field* arg = *f_iter;
-    result += arg->get_name() + ": " + type_name(arg->get_type());
+    result += struct_property_name(arg) + ": " + type_name(arg->get_type());
 
     if (++f_iter != fields.end()) {
       result += ", ";
@@ -2213,6 +2278,11 @@ void t_swift_generator::populate_reserved_words() {
   swift_reserved_words_.insert("true");
   swift_reserved_words_.insert("typealias");
   swift_reserved_words_.insert("where");
+}
+
+string t_swift_generator::struct_property_name(t_field* tfield) {
+  // TODO: Camel-case
+  return tfield->get_name();
 }
 
 string t_swift_generator::enum_value_name(t_enum_value* tenumvalue) {
