@@ -304,7 +304,7 @@ public enum TelemetryValue {
   case bool(Bool)
   case dictionary(TelemetryDictionary)
 
-  init(_ value: Any) {
+  fileprivate init(_ value: Any) {
     if let string = value as? String {
       return .string(string)
     }
@@ -444,7 +444,7 @@ void t_swift_generator::generate_enum(t_enum* tenum) {
   }
 
   if (telemetry_object_) {
-    f_impl_ << indent() << "public func telemetryValue() -> TelemetryValue";
+    f_impl_ << indent() << "fileprivate func telemetryValue() -> TelemetryValue";
     block_open(f_impl_);
     if (boost::algorithm::ends_with(tenum->get_name(), "AsInt")) {
       f_impl_ << indent() << "return .string(\"\\(rawValue)\")" << endl;
