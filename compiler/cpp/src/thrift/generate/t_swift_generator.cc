@@ -68,7 +68,10 @@ public:
         promise_kit_ = true;
       } else if( iter->first.compare("debug_descriptions") == 0) {
         debug_descriptions_ = true;
-      } else {
+      } else if( iter->first.compare("exclude_thrift_types") == 0) {
+	exclude_thrift_types_ = true;
+      }
+      else {
         throw "unknown option swift:" + iter->first;
       }
     }
@@ -235,6 +238,7 @@ private:
   bool async_clients_;
   bool promise_kit_;
   bool debug_descriptions_;
+  bool exclude_thrift_types_;
 
   set<string> swift_reserved_words_;
 };
@@ -299,7 +303,9 @@ string t_swift_generator::swift_imports() {
 string t_swift_generator::swift_thrift_imports() {
 
   vector<string> includes_list;
-  includes_list.push_back("Thrift");
+  if (!exclude_thrift_types_) {
+    includes_list.push_back("Thrift");
+  }
 
   if (promise_kit_) {
     includes_list.push_back("PromiseKit");
@@ -362,24 +368,29 @@ void t_swift_generator::generate_enum(t_enum* tenum) {
   block_close(f_decl_);
   f_decl_ << endl;
 
-  f_impl_ << indent() << "extension " << tenum->get_name() << " : TEnum";
+  f_impl_ << indent() << "extension " << tenum->get_name();
+  if (!exclude_thrift_types_) {
+    f_impl_ << " : TEnum";
+  }
   block_open(f_impl_);
 
   f_impl_ << endl;
 
-  f_impl_ << indent() << "public static func readValueFromProtocol(proto: TProtocol) throws -> " << tenum->get_name();
-  block_open(f_impl_);
-  f_impl_ << indent() << "var raw = Int32()" << endl
-          << indent() << "try proto.readI32(&raw)" << endl
-          << indent() << "return " << tenum->get_name() << "(rawValue: raw)!" << endl;
-  block_close(f_impl_);
-  f_impl_ << endl;
+  if (!exclude_thrift_types_) {
+    f_impl_ << indent() << "public static func readValueFromProtocol(proto: TProtocol) throws -> " << tenum->get_name();
+    block_open(f_impl_);
+    f_impl_ << indent() << "var raw = Int32()" << endl
+            << indent() << "try proto.readI32(&raw)" << endl
+            << indent() << "return " << tenum->get_name() << "(rawValue: raw)!" << endl;
+    block_close(f_impl_);
+    f_impl_ << endl;
 
-  f_impl_ << indent() << "public static func writeValue(value: " << tenum->get_name() << ", toProtocol proto: TProtocol) throws";
-  block_open(f_impl_);
-  f_impl_ << indent() << "try proto.writeI32(value.rawValue)" << endl;
-  block_close(f_impl_);
-  f_impl_ << endl;
+    f_impl_ << indent() << "public static func writeValue(value: " << tenum->get_name() << ", toProtocol proto: TProtocol) throws";
+    block_open(f_impl_);
+    f_impl_ << indent() << "try proto.writeI32(value.rawValue)" << endl;
+    block_close(f_impl_);
+    f_impl_ << endl;
+  }
 
   block_close(f_impl_);
   f_impl_ << endl;
@@ -682,19 +693,24 @@ void t_swift_generator::generate_swift_struct_thrift_extension(ofstream& out,
                                                                bool is_result,
                                                                bool is_private) {
 
-  indent(out) << "extension " << tstruct->get_name() << " : TStruct";
+  indent(out) << "extension " << tstruct->get_name();
+  if (!exclude_thrift_types_) {
+    out << " : TStruct";
+  }
 
   block_open(out);
 
   out << endl;
 
-  generate_swift_struct_reader(out, tstruct, is_private);
+  if (!exclude_thrift_types_) {
+    generate_swift_struct_reader(out, tstruct, is_private);
 
-  if (is_result) {
-    generate_swift_struct_result_writer(out, tstruct);
-  }
-  else {
-    generate_swift_struct_writer(out, tstruct, is_private);
+    if (is_result) {
+      generate_swift_struct_result_writer(out, tstruct);
+    }
+    else {
+      generate_swift_struct_writer(out, tstruct, is_private);
+    }
   }
 
   block_close(out);
@@ -1798,7 +1814,12 @@ string t_swift_generator::type_name(t_type* ttype, bool is_optional, bool is_for
     result = base_type_name((t_base_type*)ttype);
   } else if (ttype->is_map()) {
     t_map *map = (t_map *)ttype;
-    result = "TMap<" + type_name(map->get_key_type()) + ", " + type_name(map->get_val_type()) + ">";
+    if (exclude_thrift_types_) {
+      result = "[" + type_name(map->get_key_type()) + ": " + type_name(map->get_val_type()) + "]";
+    }
+    else {
+      result = "TMap<" + type_name(map->get_key_type()) + ", " + type_name(map->get_val_type()) + ">";
+    }
   } else if (ttype->is_set()) {
     t_set *set = (t_set *)ttype;
     result = "TSet<" + type_name(set->get_elem_type()) + ">";
@@ -2093,7 +2114,7 @@ string t_swift_generator::argument_list(t_struct* tstruct, string protocol_name,
   const vector<t_field*>& fields = tstruct->get_members();
   vector<t_field*>::const_iterator f_iter;
 
-  if (include_protocol) {
+  if (include_protocol && !exclude_thrift_types_) {
     result += protocol_name + ": TProtocol";
     if (!fields.empty()) {
       result += ", ";
