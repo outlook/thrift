@@ -134,6 +134,7 @@ public:
                                                  bool is_private);
   void generate_swift_struct_telemetry_object_extension(ofstream& out, t_struct* tstruct);
   void generate_swift_struct_telemetry_event_extension(ofstream& out, t_struct* tstruct);
+  void telemetry_dictionary_value(ofstream& out, t_type* type, string property_name);
   void generate_swift_struct_thrift_extension(ofstream& out,
                                               t_struct* tstruct,
                                               bool is_result,
@@ -800,12 +801,7 @@ void t_swift_generator::generate_swift_struct_telemetry_object_extension(ofstrea
     }
 
     out << indent() << "telemetryData[\"" << member->get_name() << "\"] = ";
-    if (member->get_type()->is_enum()) {
-      out << ".string(" << struct_property_name(member) << ".telemetryName())";
-    }
-    else {
-      out << "TelemetryValue(" << struct_property_name(member) << ")";
-    }
+    telemetry_dictionary_value(out, member->get_type(), struct_property_name(member));
     out << endl;
 
     if (optional) {
@@ -819,6 +815,72 @@ void t_swift_generator::generate_swift_struct_telemetry_object_extension(ofstrea
   block_close(out);
 
   out << endl;
+}
+
+void t_swift_generator::telemetry_dictionary_value(ofstream& out, t_type* type, string property_name) {
+  type = get_true_type(type);
+
+  if (type->is_base_type()) {
+    t_base_type::t_base tbase = ((t_base_type*)type)->get_base();
+    switch (tbase) {
+    case t_base_type::TYPE_STRING:
+    case t_base_type::TYPE_BOOL:
+    case t_base_type::TYPE_I8:
+    case t_base_type::TYPE_I16:
+    case t_base_type::TYPE_I32:
+    case t_base_type::TYPE_I64:
+    case t_base_type::TYPE_DOUBLE:
+      out << "TelemetryValue(" << property_name << ")";
+      break;
+    default:
+      throw "compiler error: invalid base type " + type->get_name();
+      break;
+    }
+  } else if (type->is_map()) {
+    t_map *tmap = (t_map*)type;
+
+    out << ".dictionary({";
+
+    indent_up();
+    out << endl;
+
+    out << indent() << "var dictionary = TelemetryDictionary()" << endl;
+    out << indent() << "for (key, value) in " << property_name;
+
+    block_open(out);
+
+    out << indent() << "dictionary[";
+
+    t_type* key_type = get_true_type(tmap->get_key_type());
+    if (key_type->is_string()) {
+      out << "key";
+    } else if (key_type->is_enum()) {
+      out << "key.telemetryName()";
+    }
+    else {
+      throw "compiler error: unsupported key type for map " + key_type->get_name();
+    }
+
+    out << "] = ";
+
+    telemetry_dictionary_value(out, tmap->get_val_type(), "value");
+
+    out << endl;
+
+    block_close(out);
+
+    out << indent() << "return dictionary" << endl;
+
+    block_close(out, false);
+    out << "())";
+  } else if (type->is_enum()) {
+    out << ".string(" << property_name << ".telemetryName())";
+  } else if (type->is_struct()) {
+    out << "TelemetryValue(" << property_name << ")";
+  }
+  else {
+    throw "compiler error: invalid type " + type->get_name();
+  }
 }
 
 /**
