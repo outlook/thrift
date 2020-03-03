@@ -700,7 +700,7 @@ void t_swift_generator::generate_swift_struct_equatable_extension(ofstream& out,
     for (m_iter = members.begin(); m_iter != members.end();) {
       t_field* tfield = *m_iter;
       indent(out) << "(lhs." << maybe_escape_identifier(struct_property_name(tfield))
-                  << " ?== rhs." << maybe_escape_identifier(struct_property_name(tfield)) << ")";
+                  << " == rhs." << maybe_escape_identifier(struct_property_name(tfield)) << ")";
       if (++m_iter != members.end()) {
         out << " &&";
       }
