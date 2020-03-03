@@ -133,6 +133,7 @@ public:
                                                  t_struct* tstruct,
                                                  bool is_private);
   void generate_swift_struct_telemetry_object_extension(ofstream& out, t_struct* tstruct);
+  void generate_swift_struct_telemetry_event_extension(ofstream& out, t_struct* tstruct);
   void generate_swift_struct_thrift_extension(ofstream& out,
                                               t_struct* tstruct,
                                               bool is_result,
