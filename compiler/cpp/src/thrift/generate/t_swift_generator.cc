@@ -299,7 +299,7 @@ public protocol TelemetryObject {
   func telemetryDictionary() -> TelemetryDictionary
 }
 
-public enum TelemetryValue {
+public enum TelemetryValue: Equatable {
   case string(String)
   case bool(Bool)
   case dictionary(TelemetryDictionary)
