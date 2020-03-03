@@ -60,6 +60,8 @@ public:
     async_clients_ = false;
     promise_kit_ = false;
     debug_descriptions_ = false;
+    exclude_thrift_types_ = false;
+    telemetry_object_ = false;
 
     for( iter = parsed_options.begin(); iter != parsed_options.end(); ++iter) {
       if( iter->first.compare("log_unexpected") == 0) {
@@ -297,6 +299,12 @@ public typealias TelemetryDictionary = [String: TelemetryValue]
 
 public protocol TelemetryObject {
   func telemetryDictionary() -> TelemetryDictionary
+}
+
+public protocol TelemetryEvent: TelemetryObject {
+  var eventName: String { get }
+  var propertiesGeneral: OTPropertiesGeneral { get set }
+  var diagnosticPrivacyLevel: OTPrivacyLevel { get }
 }
 
 public enum TelemetryValue: Equatable {
@@ -733,8 +741,36 @@ void t_swift_generator::generate_swift_struct_implementation(ofstream& out,
   }
   if (telemetry_object_) {
     generate_swift_struct_telemetry_object_extension(out, tstruct);
+    generate_swift_struct_telemetry_event_extension(out, tstruct);
   }
   out << endl << endl;
+}
+
+/**
+ * Generate the TelemetryEvent protocol implementation
+ *
+ * @param tstruct The structure definition
+ */
+void t_swift_generator::generate_swift_struct_telemetry_event_extension(ofstream& out, t_struct* tstruct) {
+  bool contains_event_name = false;
+
+  for (const auto& member : tstruct->get_members()) {
+    if (member->get_name() == "event_name") {
+      contains_event_name = true;
+      break;
+    }
+  }
+
+  if (!contains_event_name) {
+    // This is not an event struct, do not add the protocol
+    return;
+  }
+
+  indent(out) << "extension " << tstruct->get_name() << " : TelemetryEvent";
+  block_open(out);
+  block_close(out);
+
+  out << endl;
 }
 
 /**
