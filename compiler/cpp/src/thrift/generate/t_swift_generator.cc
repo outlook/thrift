@@ -1064,7 +1064,7 @@ void t_swift_generator::generate_swift_struct_printable_extension(ofstream& out,
 
   for (f_iter = fields.begin(); f_iter != fields.end();) {
     indent(out) << "desc += \"" << struct_property_name(*f_iter)
-                << "=\\(self." << struct_property_name(*f_iter) << ")";
+                << "=\\(String(describing: self." << struct_property_name(*f_iter) << "))";
     if (++f_iter != fields.end()) {
       out << ", ";
     }
