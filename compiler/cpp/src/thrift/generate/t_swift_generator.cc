@@ -71,9 +71,9 @@ public:
       } else if( iter->first.compare("debug_descriptions") == 0) {
         debug_descriptions_ = true;
       } else if( iter->first.compare("exclude_thrift_types") == 0) {
-	exclude_thrift_types_ = true;
+        exclude_thrift_types_ = true;
       } else if( iter->first.compare("telemetry_object") == 0) {
-	telemetry_object_ = true;
+        telemetry_object_ = true;
       }
       else {
         throw "unknown option swift:" + iter->first;
