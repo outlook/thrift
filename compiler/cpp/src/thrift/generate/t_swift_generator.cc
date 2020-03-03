@@ -28,6 +28,8 @@
 #include <sstream>
 #include "thrift/platform.h"
 #include "thrift/generate/t_oop_generator.h"
+#include <boost/algorithm/string/replace.hpp>
+#include <boost/algorithm/string/predicate.hpp>
 
 using std::map;
 using std::ostream;
@@ -68,7 +70,12 @@ public:
         promise_kit_ = true;
       } else if( iter->first.compare("debug_descriptions") == 0) {
         debug_descriptions_ = true;
-      } else {
+      } else if( iter->first.compare("exclude_thrift_types") == 0) {
+        exclude_thrift_types_ = true;
+      } else if( iter->first.compare("telemetry_object") == 0) {
+        telemetry_object_ = true;
+      }
+      else {
         throw "unknown option swift:" + iter->first;
       }
     }
@@ -123,6 +130,7 @@ public:
   void generate_swift_struct_equatable_extension(ofstream& out,
                                                  t_struct* tstruct,
                                                  bool is_private);
+  void generate_swift_struct_telemetry_object_extension(ofstream& out, t_struct* tstruct);
   void generate_swift_struct_thrift_extension(ofstream& out,
                                               t_struct* tstruct,
                                               bool is_result,
@@ -168,6 +176,7 @@ public:
    * Helper rendering functions
    */
 
+  string telemetry_object_protocols();
   string swift_imports();
   string swift_thrift_imports();
   string type_name(t_type* ttype, bool is_optional=false, bool is_forced=false);
@@ -181,6 +190,9 @@ public:
   string type_to_enum(t_type* ttype, bool qualified=false);
   string maybe_escape_identifier(const string& identifier);
   void populate_reserved_words();
+  string enum_value_name(t_enum_value* tenumvalue);
+  string struct_property_name(t_field* field);
+  string camel_case_from_underscore(string underscore_name);
 
 private:
 
@@ -235,6 +247,8 @@ private:
   bool async_clients_;
   bool promise_kit_;
   bool debug_descriptions_;
+  bool exclude_thrift_types_;
+  bool telemetry_object_;
 
   set<string> swift_reserved_words_;
 };
@@ -267,6 +281,47 @@ void t_swift_generator::init_generator() {
 
   f_impl_ << swift_imports() << swift_thrift_imports() << endl;
 
+  if (telemetry_object_) {
+    f_impl_ << telemetry_object_protocols() << endl << endl;
+  }
+}
+
+/**
+ * Prints protocols necessary for telemetry objects
+ *
+ * @return Protocols for telemetry objects
+ */
+string t_swift_generator::telemetry_object_protocols() {
+  return R"objc(
+public typealias TelemetryDictionary = [String: TelemetryValue]
+
+public protocol TelemetryObject {
+  func telemetryDictionary() -> TelemetryDictionary
+}
+
+public enum TelemetryValue: Equatable {
+  case string(String)
+  case bool(Bool)
+  case dictionary(TelemetryDictionary)
+
+  fileprivate init(_ value: Any) {
+    if let string = value as? String {
+      self = .string(string)
+    }
+    else if let bool = value as? Bool {
+      self = .bool(bool)
+    }
+    else if let telemetryObject = value as? TelemetryObject {
+      self = .dictionary(telemetryObject.telemetryDictionary())
+    }
+    else {
+      // Convert other types to string
+      self = .string("\(value)")
+    }
+  }
+}
+
+)objc";
 }
 
 /**
@@ -299,7 +354,9 @@ string t_swift_generator::swift_imports() {
 string t_swift_generator::swift_thrift_imports() {
 
   vector<string> includes_list;
-  includes_list.push_back("Thrift");
+  if (!exclude_thrift_types_) {
+    includes_list.push_back("Thrift");
+  }
 
   if (promise_kit_) {
     includes_list.push_back("PromiseKit");
@@ -352,7 +409,7 @@ void t_swift_generator::generate_enum(t_enum* tenum) {
   vector<t_enum_value*>::iterator c_iter;
 
   for (c_iter = constants.begin(); c_iter != constants.end(); ++c_iter) {
-    f_decl_ << indent() << "case " << (*c_iter)->get_name()
+    f_decl_ << indent() << "case " << enum_value_name(*c_iter)
             << " = " << (*c_iter)->get_value() << endl;
   }
 
@@ -362,24 +419,45 @@ void t_swift_generator::generate_enum(t_enum* tenum) {
   block_close(f_decl_);
   f_decl_ << endl;
 
-  f_impl_ << indent() << "extension " << tenum->get_name() << " : TEnum";
+  f_impl_ << indent() << "extension " << tenum->get_name();
+  if (!exclude_thrift_types_) {
+    f_impl_ << " : TEnum";
+  }
   block_open(f_impl_);
 
   f_impl_ << endl;
 
-  f_impl_ << indent() << "public static func readValueFromProtocol(proto: TProtocol) throws -> " << tenum->get_name();
-  block_open(f_impl_);
-  f_impl_ << indent() << "var raw = Int32()" << endl
-          << indent() << "try proto.readI32(&raw)" << endl
-          << indent() << "return " << tenum->get_name() << "(rawValue: raw)!" << endl;
-  block_close(f_impl_);
-  f_impl_ << endl;
+  if (!exclude_thrift_types_) {
+    f_impl_ << indent() << "public static func readValueFromProtocol(proto: TProtocol) throws -> " << tenum->get_name();
+    block_open(f_impl_);
+    f_impl_ << indent() << "var raw = Int32()" << endl
+            << indent() << "try proto.readI32(&raw)" << endl
+            << indent() << "return " << tenum->get_name() << "(rawValue: raw)!" << endl;
+    block_close(f_impl_);
+    f_impl_ << endl;
 
-  f_impl_ << indent() << "public static func writeValue(value: " << tenum->get_name() << ", toProtocol proto: TProtocol) throws";
-  block_open(f_impl_);
-  f_impl_ << indent() << "try proto.writeI32(value.rawValue)" << endl;
-  block_close(f_impl_);
-  f_impl_ << endl;
+    f_impl_ << indent() << "public static func writeValue(value: " << tenum->get_name() << ", toProtocol proto: TProtocol) throws";
+    block_open(f_impl_);
+    f_impl_ << indent() << "try proto.writeI32(value.rawValue)" << endl;
+    block_close(f_impl_);
+    f_impl_ << endl;
+  }
+
+  if (telemetry_object_) {
+    f_impl_ << indent() << "fileprivate func telemetryValue() -> TelemetryValue";
+    block_open(f_impl_);
+    if (boost::algorithm::ends_with(tenum->get_name(), "AsInt")) {
+      f_impl_ << indent() << "return .string(\"\\(rawValue)\")" << endl;
+    }
+    else {
+      f_impl_ << indent() << "switch self {" << endl;
+      for (const auto& value : tenum->get_constants()) {
+        f_impl_ << indent() << "case ." << enum_value_name(value) << ": return .string(\"" << value->get_name() << "\")" << endl;
+      }
+      f_impl_ << indent() << "}" << endl;
+    }
+    block_close(f_impl_);
+  }
 
   block_close(f_impl_);
   f_impl_ << endl;
@@ -516,7 +594,7 @@ void t_swift_generator::generate_swift_struct_init(ofstream& out,
       else {
         out << ", ";
       }
-      out << (*m_iter)->get_name() << ": "
+      out << struct_property_name(*m_iter) << ": "
           << maybe_escape_identifier(type_name((*m_iter)->get_type(), field_is_optional(*m_iter)));
     }
     ++m_iter;
@@ -527,8 +605,8 @@ void t_swift_generator::generate_swift_struct_init(ofstream& out,
 
   for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
     if (all || (*m_iter)->get_req() == t_field::T_REQUIRED || (*m_iter)->get_req() == t_field::T_OPT_IN_REQ_OUT) {
-      out << indent() << "self." << maybe_escape_identifier((*m_iter)->get_name()) << " = "
-          << maybe_escape_identifier((*m_iter)->get_name()) << endl;
+      out << indent() << "self." << struct_property_name(*m_iter) << " = "
+          << struct_property_name(*m_iter) << endl;
     }
   }
 
@@ -556,7 +634,7 @@ void t_swift_generator::generate_swift_struct_hashable_extension(ofstream& out,
 
   out << endl;
 
-  indent(out) << visibility << " var hashValue : Int";
+  indent(out) << visibility << " func hash(into hasher: inout Hasher)";
 
   block_open(out);
 
@@ -564,22 +642,9 @@ void t_swift_generator::generate_swift_struct_hashable_extension(ofstream& out,
   const vector<t_field*>& members = tstruct->get_members();
   vector<t_field*>::const_iterator m_iter;
 
-  if (!members.empty()) {
-    indent(out) << "let prime = 31" << endl;
-    indent(out) << "var result = 1" << endl;
-
-    for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
-      t_field* tfield = *m_iter;
-      string accessor = field_is_optional(tfield) ? "?." : ".";
-      string defaultor = field_is_optional(tfield) ? " ?? 0" : "";
-      indent(out) << "result = prime &* result &+ (" << maybe_escape_identifier(tfield->get_name()) << accessor
-                  <<  "hashValue" << defaultor << ")" << endl;
-    }
-
-    indent(out) << "return result" << endl;
-  }
-  else {
-    indent(out) << "return 31" << endl;
+  for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
+    t_field* tfield = *m_iter;
+    indent(out) << "hasher.combine(" << struct_property_name(tfield) << ")" << endl;
   }
 
   block_close(out);
@@ -621,8 +686,8 @@ void t_swift_generator::generate_swift_struct_equatable_extension(ofstream& out,
 
     for (m_iter = members.begin(); m_iter != members.end();) {
       t_field* tfield = *m_iter;
-      indent(out) << "(lhs." << maybe_escape_identifier(tfield->get_name())
-                  << " ?== rhs." << maybe_escape_identifier(tfield->get_name()) << ")";
+      indent(out) << "(lhs." << struct_property_name(tfield)
+                  << " == rhs." << struct_property_name(tfield) << ")";
       if (++m_iter != members.end()) {
         out << " &&";
       }
@@ -663,9 +728,60 @@ void t_swift_generator::generate_swift_struct_implementation(ofstream& out,
   }
 
   generate_swift_struct_hashable_extension(out, tstruct, is_private);
-  generate_swift_struct_thrift_extension(out, tstruct, is_result, is_private);
-
+  if (!exclude_thrift_types_) {
+    generate_swift_struct_thrift_extension(out, tstruct, is_result, is_private);
+  }
+  if (telemetry_object_) {
+    generate_swift_struct_telemetry_object_extension(out, tstruct);
+  }
   out << endl << endl;
+}
+
+/**
+ * Generate the TelemetryObject protocol implementation
+ *
+ * @param tstruct The structure definition
+ */
+void t_swift_generator::generate_swift_struct_telemetry_object_extension(ofstream& out, t_struct* tstruct) {
+  indent(out) << "extension " << tstruct->get_name() << " : TelemetryObject";
+  block_open(out);
+
+  out << endl;
+
+  out << indent() << "public func telemetryDictionary() -> TelemetryDictionary";
+  block_open(out);
+ 
+  out << endl;
+
+  out << indent() << "var telemetryData = TelemetryDictionary()" << endl;
+
+  for (const auto& member : tstruct->get_members()) {
+    bool optional = field_is_optional(member);
+    if (optional) {
+      out << indent() << "if let " << struct_property_name(member) << " = " << struct_property_name(member);
+      block_open(out);
+    }
+
+    out << indent() << "telemetryData[\"" << member->get_name() << "\"] = ";
+    if (member->get_type()->is_enum()) {
+      out << struct_property_name(member) << ".telemetryValue()";
+    }
+    else {
+      out << "TelemetryValue(" << struct_property_name(member) << ")";
+    }
+    out << endl;
+
+    if (optional) {
+      block_close(out);
+    }
+  }
+
+  out << indent() << "return telemetryData" << endl;
+  
+  block_close(out);
+  block_close(out);
+
+  out << endl;
 }
 
 /**
@@ -683,7 +799,6 @@ void t_swift_generator::generate_swift_struct_thrift_extension(ofstream& out,
                                                                bool is_private) {
 
   indent(out) << "extension " << tstruct->get_name() << " : TStruct";
-
   block_open(out);
 
   out << endl;
@@ -730,7 +845,7 @@ void t_swift_generator::generate_swift_struct_reader(ofstream& out,
 
   for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
     bool optional = field_is_optional(*f_iter);
-    indent(out) << "var " << maybe_escape_identifier((*f_iter)->get_name()) << " : "
+    indent(out) << "var " << struct_property_name(*f_iter) << " : "
                 << type_name((*f_iter)->get_type(), optional, !optional) << endl;
   }
 
@@ -846,8 +961,8 @@ void t_swift_generator::generate_swift_struct_writer(ofstream& out,
 
     bool optional = field_is_optional(tfield);
     if (optional) {
-      indent(out) << "if let " << maybe_escape_identifier(tfield->get_name())
-                  << " = __value." << maybe_escape_identifier(tfield->get_name());
+      indent(out) << "if let " << struct_property_name(tfield)
+                  << " = __value." << struct_property_name(tfield);
       block_open(out);
     }
 
@@ -901,7 +1016,7 @@ void t_swift_generator::generate_swift_struct_result_writer(ofstream& out, t_str
   for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
     t_field *tfield = *f_iter;
 
-    indent(out) << "if let result = __value." << (*f_iter)->get_name();
+    indent(out) << "if let result = __value." << struct_property_name(*f_iter);
 
     block_open(out);
 
@@ -948,8 +1063,8 @@ void t_swift_generator::generate_swift_struct_printable_extension(ofstream& out,
   vector<t_field*>::const_iterator f_iter;
 
   for (f_iter = fields.begin(); f_iter != fields.end();) {
-    indent(out) << "desc += \"" << (*f_iter)->get_name()
-                << "=\\(self." << maybe_escape_identifier((*f_iter)->get_name()) << ")";
+    indent(out) << "desc += \"" << struct_property_name(*f_iter)
+                << "=\\(String(describing: self." << struct_property_name(*f_iter) << "))";
     if (++f_iter != fields.end()) {
       out << ", ";
     }
@@ -1290,7 +1405,7 @@ void t_swift_generator::generate_swift_service_client_send_function_implementati
 
   for (f_iter = fields.begin(); f_iter != fields.end();) {
     t_field *tfield = (*f_iter);
-    out << tfield->get_name() << ": " << tfield->get_name();
+    out << struct_property_name(tfield) << ": " << struct_property_name(tfield);
     if (++f_iter != fields.end()) {
       out << ", ";
     }
@@ -1363,9 +1478,9 @@ void t_swift_generator::generate_swift_service_client_recv_function_implementati
   vector<t_field*>::const_iterator x_iter;
 
   for (x_iter = xceptions.begin(); x_iter != xceptions.end(); ++x_iter) {
-    indent(out) << "if let " << (*x_iter)->get_name() << " = __result." << (*x_iter)->get_name();
+    indent(out) << "if let " << struct_property_name(*x_iter) << " = __result." << struct_property_name(*x_iter);
     block_open(out);
-    indent(out) << "throw " << (*x_iter)->get_name() << endl;
+    indent(out) << "throw " << struct_property_name(*x_iter) << endl;
     block_close(out);
   }
 
@@ -1402,7 +1517,7 @@ void t_swift_generator::generate_swift_service_client_send_function_invocation(o
   vector<t_field*>::const_iterator f_iter;
 
   for (f_iter = fields.begin(); f_iter != fields.end();) {
-    out << (*f_iter)->get_name() << ": " << (*f_iter)->get_name();
+    out << (*f_iter)->get_name() << ": " << struct_property_name(*f_iter);
     if (++f_iter != fields.end()) {
       out << ", ";
     }
@@ -1427,7 +1542,7 @@ void t_swift_generator::generate_swift_service_client_send_async_function_invoca
   indent(out) << "try send_" << tfunction->get_name() << "(__protocol";
 
   for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
-    out << ", " << (*f_iter)->get_name() << ": " << (*f_iter)->get_name();
+    out << ", " << struct_property_name(*f_iter) << ": " << struct_property_name(*f_iter);
   }
 
   out << ")" << endl;
@@ -1696,7 +1811,7 @@ void t_swift_generator::generate_swift_service_server_implementation(ofstream& o
       vector<t_field*>::const_iterator f_iter;
 
       for (f_iter = fields.begin(); f_iter != fields.end();) {
-        string fieldName = (*f_iter)->get_name();
+        string fieldName = struct_property_name(*f_iter);
         if (f_iter != fields.begin()) {
           out << fieldName << ": ";
         }
@@ -1717,7 +1832,7 @@ void t_swift_generator::generate_swift_service_server_implementation(ofstream& o
       for (x_iter = xfields.begin(); x_iter != xfields.end(); ++x_iter) {
         indent(out) << "catch let error as " << (*x_iter)->get_type()->get_name();
         block_open(out);
-        indent(out) << "result." << (*x_iter)->get_name() << " = error" << endl;
+        indent(out) << "result." << struct_property_name(*x_iter) << " = error" << endl;
         block_close(out);
       }
 
@@ -1798,7 +1913,12 @@ string t_swift_generator::type_name(t_type* ttype, bool is_optional, bool is_for
     result = base_type_name((t_base_type*)ttype);
   } else if (ttype->is_map()) {
     t_map *map = (t_map *)ttype;
-    result = "TMap<" + type_name(map->get_key_type()) + ", " + type_name(map->get_val_type()) + ">";
+    if (exclude_thrift_types_) {
+      result = "[" + type_name(map->get_key_type()) + ": " + type_name(map->get_val_type()) + "]";
+    }
+    else {
+      result = "TMap<" + type_name(map->get_key_type()) + ", " + type_name(map->get_val_type()) + ">";
+    }
   } else if (ttype->is_set()) {
     t_set *set = (t_set *)ttype;
     result = "TSet<" + type_name(set->get_elem_type()) + ">";
@@ -1892,9 +2012,8 @@ void t_swift_generator::render_const_value(ostream& out,
       throw "compiler error: no const of base type " + t_base_type::t_base_name(tbase);
     }
   } else if (type->is_enum()) {
-    out << value->get_identifier();
+    out << type->get_name() << "." << camel_case_from_underscore(value->get_identifier_name());
   } else if (type->is_struct() || type->is_xception()) {
-
     out << type_name(type) << "(";
 
     const vector<t_field*>& fields = ((t_struct*)type)->get_members();
@@ -1907,7 +2026,7 @@ void t_swift_generator::render_const_value(ostream& out,
       t_field* tfield = *f_iter;
       t_const_value* value = NULL;
       for (v_iter = val.begin(); v_iter != val.end(); ++v_iter) {
-        if (tfield->get_name() == v_iter->first->get_string()) {
+        if (struct_property_name(tfield) == v_iter->first->get_string()) {
           value = v_iter->second;
         }
       }
@@ -2007,13 +2126,20 @@ string t_swift_generator::declare_property(t_field* tfield, bool is_private) {
 
   ostringstream render;
 
-  render << visibility << " var " << maybe_escape_identifier(tfield->get_name());
+  render << visibility << " var " << struct_property_name(tfield);
 
-  if (field_is_optional(tfield)) {
-    render << " : " << type_name(tfield->get_type(), true);
+  if (tfield->get_value() != NULL) {
+    t_type* type = tfield->get_type();
+    render << " = ";
+    render_const_value(render, type, tfield->get_value());
   }
   else {
-    render << " = " << type_name(tfield->get_type(), false) << "()";
+    if (field_is_optional(tfield)) {
+      render << " : " << type_name(tfield->get_type(), true);
+    }
+    else {
+      render << " = " << type_name(tfield->get_type(), false) << "()";
+    }
   }
 
   return render.str();
@@ -2093,7 +2219,7 @@ string t_swift_generator::argument_list(t_struct* tstruct, string protocol_name,
   const vector<t_field*>& fields = tstruct->get_members();
   vector<t_field*>::const_iterator f_iter;
 
-  if (include_protocol) {
+  if (include_protocol && !exclude_thrift_types_) {
     result += protocol_name + ": TProtocol";
     if (!fields.empty()) {
       result += ", ";
@@ -2106,7 +2232,7 @@ string t_swift_generator::argument_list(t_struct* tstruct, string protocol_name,
 
   for (f_iter = fields.begin(); f_iter != fields.end();) {
     t_field* arg = *f_iter;
-    result += arg->get_name() + ": " + type_name(arg->get_type());
+    result += struct_property_name(arg) + ": " + type_name(arg->get_type());
 
     if (++f_iter != fields.end()) {
       result += ", ";
@@ -2146,6 +2272,36 @@ void t_swift_generator::populate_reserved_words() {
   swift_reserved_words_.insert("true");
   swift_reserved_words_.insert("typealias");
   swift_reserved_words_.insert("where");
+}
+
+string t_swift_generator::struct_property_name(t_field* tfield) {
+  return maybe_escape_identifier(camel_case_from_underscore(tfield->get_name()));
+}
+
+string t_swift_generator::enum_value_name(t_enum_value* tenumvalue) {
+  return maybe_escape_identifier(camel_case_from_underscore(tenumvalue->get_name()));
+}
+ 
+string t_swift_generator::camel_case_from_underscore(string underscore_name) {
+  // Convert to camel case
+  std::string cap_value_name = underscore_name;
+  cap_value_name[0] = tolower(underscore_name[0]);
+
+  // Underscores separate words
+  bool cap_next = false;
+  for (string::iterator iter = cap_value_name.begin(); iter < cap_value_name.end(); iter++) {
+    if (cap_next) {
+      *iter = toupper(*iter);
+      cap_next = false;
+    }
+    else if (*iter == '_') {
+      cap_next = true;
+    }
+  }
+
+  boost::replace_all(cap_value_name, "_", "");
+
+  return cap_value_name;
 }
 
 string t_swift_generator::maybe_escape_identifier(const string& identifier) {
