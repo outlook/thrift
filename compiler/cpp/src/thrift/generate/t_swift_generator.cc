@@ -306,17 +306,17 @@ public enum TelemetryValue {
 
   fileprivate init(_ value: Any) {
     if let string = value as? String {
-      return .string(string)
+      self = .string(string)
     }
     else if let bool = value as? Bool {
-      return .bool(bool)
+      self = .bool(bool)
     }
     else if let telemetryObject = value as? TelemetryObject {
-      return .dictionary(value.telemetryDictionary())
+      self = .dictionary(telemetryObject.telemetryDictionary())
     }
     else {
       // Convert other types to string
-      return .string("\(value)")
+      self = .string("\(value)")
     }
   }
 }
@@ -605,8 +605,8 @@ void t_swift_generator::generate_swift_struct_init(ofstream& out,
 
   for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
     if (all || (*m_iter)->get_req() == t_field::T_REQUIRED || (*m_iter)->get_req() == t_field::T_OPT_IN_REQ_OUT) {
-      out << indent() << "self." << maybe_escape_identifier(struct_property_name(*m_iter)) << " = "
-          << maybe_escape_identifier(struct_property_name(*m_iter)) << endl;
+      out << indent() << "self." << struct_property_name(*m_iter) << " = "
+          << struct_property_name(*m_iter) << endl;
     }
   }
 
@@ -634,7 +634,7 @@ void t_swift_generator::generate_swift_struct_hashable_extension(ofstream& out,
 
   out << endl;
 
-  indent(out) << visibility << " var hashValue : Int";
+  indent(out) << visibility << " func hash(into hasher: inout Hasher)";
 
   block_open(out);
 
@@ -642,22 +642,9 @@ void t_swift_generator::generate_swift_struct_hashable_extension(ofstream& out,
   const vector<t_field*>& members = tstruct->get_members();
   vector<t_field*>::const_iterator m_iter;
 
-  if (!members.empty()) {
-    indent(out) << "let prime = 31" << endl;
-    indent(out) << "var result = 1" << endl;
-
-    for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
-      t_field* tfield = *m_iter;
-      string accessor = field_is_optional(tfield) ? "?." : ".";
-      string defaultor = field_is_optional(tfield) ? " ?? 0" : "";
-      indent(out) << "result = prime &* result &+ (" << maybe_escape_identifier(struct_property_name(tfield)) << accessor
-                  <<  "hashValue" << defaultor << ")" << endl;
-    }
-
-    indent(out) << "return result" << endl;
-  }
-  else {
-    indent(out) << "return 31" << endl;
+  for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
+    t_field* tfield = *m_iter;
+    indent(out) << "hasher.combine(" << struct_property_name(tfield) << ")" << endl;
   }
 
   block_close(out);
@@ -699,8 +686,8 @@ void t_swift_generator::generate_swift_struct_equatable_extension(ofstream& out,
 
     for (m_iter = members.begin(); m_iter != members.end();) {
       t_field* tfield = *m_iter;
-      indent(out) << "(lhs." << maybe_escape_identifier(struct_property_name(tfield))
-                  << " == rhs." << maybe_escape_identifier(struct_property_name(tfield)) << ")";
+      indent(out) << "(lhs." << struct_property_name(tfield)
+                  << " == rhs." << struct_property_name(tfield) << ")";
       if (++m_iter != members.end()) {
         out << " &&";
       }
@@ -858,7 +845,7 @@ void t_swift_generator::generate_swift_struct_reader(ofstream& out,
 
   for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
     bool optional = field_is_optional(*f_iter);
-    indent(out) << "var " << maybe_escape_identifier(struct_property_name(*f_iter)) << " : "
+    indent(out) << "var " << struct_property_name(*f_iter) << " : "
                 << type_name((*f_iter)->get_type(), optional, !optional) << endl;
   }
 
@@ -974,8 +961,8 @@ void t_swift_generator::generate_swift_struct_writer(ofstream& out,
 
     bool optional = field_is_optional(tfield);
     if (optional) {
-      indent(out) << "if let " << maybe_escape_identifier(struct_property_name(tfield))
-                  << " = __value." << maybe_escape_identifier(struct_property_name(tfield));
+      indent(out) << "if let " << struct_property_name(tfield)
+                  << " = __value." << struct_property_name(tfield);
       block_open(out);
     }
 
@@ -1077,7 +1064,7 @@ void t_swift_generator::generate_swift_struct_printable_extension(ofstream& out,
 
   for (f_iter = fields.begin(); f_iter != fields.end();) {
     indent(out) << "desc += \"" << struct_property_name(*f_iter)
-                << "=\\(self." << maybe_escape_identifier(struct_property_name(*f_iter)) << ")";
+                << "=\\(self." << struct_property_name(*f_iter) << ")";
     if (++f_iter != fields.end()) {
       out << ", ";
     }
@@ -2139,7 +2126,7 @@ string t_swift_generator::declare_property(t_field* tfield, bool is_private) {
 
   ostringstream render;
 
-  render << visibility << " var " << maybe_escape_identifier(struct_property_name(tfield));
+  render << visibility << " var " << struct_property_name(tfield);
 
   if (tfield->get_value() != NULL) {
     t_type* type = tfield->get_type();
@@ -2288,11 +2275,11 @@ void t_swift_generator::populate_reserved_words() {
 }
 
 string t_swift_generator::struct_property_name(t_field* tfield) {
-  return camel_case_from_underscore(tfield->get_name());
+  return maybe_escape_identifier(camel_case_from_underscore(tfield->get_name()));
 }
 
 string t_swift_generator::enum_value_name(t_enum_value* tenumvalue) {
-  return camel_case_from_underscore(tenumvalue->get_name());
+  return maybe_escape_identifier(camel_case_from_underscore(tenumvalue->get_name()));
 }
  
 string t_swift_generator::camel_case_from_underscore(string underscore_name) {
