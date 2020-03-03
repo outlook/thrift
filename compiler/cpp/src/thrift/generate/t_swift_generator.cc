@@ -60,6 +60,8 @@ public:
     async_clients_ = false;
     promise_kit_ = false;
     debug_descriptions_ = false;
+    exclude_thrift_types_ = false;
+    telemetry_object_ = false;
 
     for( iter = parsed_options.begin(); iter != parsed_options.end(); ++iter) {
       if( iter->first.compare("log_unexpected") == 0) {
@@ -131,6 +133,7 @@ public:
                                                  t_struct* tstruct,
                                                  bool is_private);
   void generate_swift_struct_telemetry_object_extension(ofstream& out, t_struct* tstruct);
+  void generate_swift_struct_telemetry_event_extension(ofstream& out, t_struct* tstruct);
   void generate_swift_struct_thrift_extension(ofstream& out,
                                               t_struct* tstruct,
                                               bool is_result,
@@ -299,6 +302,12 @@ public protocol TelemetryObject {
   func telemetryDictionary() -> TelemetryDictionary
 }
 
+public protocol TelemetryEvent: TelemetryObject {
+  var eventName: String { get }
+  var propertiesGeneral: OTPropertiesGeneral { get set }
+  var diagnosticPrivacyLevel: OTPrivacyLevel { get }
+}
+
 public enum TelemetryValue: Equatable {
   case string(String)
   case bool(Bool)
@@ -444,15 +453,15 @@ void t_swift_generator::generate_enum(t_enum* tenum) {
   }
 
   if (telemetry_object_) {
-    f_impl_ << indent() << "fileprivate func telemetryValue() -> TelemetryValue";
+    f_impl_ << indent() << "public func telemetryName() -> String";
     block_open(f_impl_);
     if (boost::algorithm::ends_with(tenum->get_name(), "AsInt")) {
-      f_impl_ << indent() << "return .string(\"\\(rawValue)\")" << endl;
+      f_impl_ << indent() << "return \"\\(rawValue)\"" << endl;
     }
     else {
       f_impl_ << indent() << "switch self {" << endl;
       for (const auto& value : tenum->get_constants()) {
-        f_impl_ << indent() << "case ." << enum_value_name(value) << ": return .string(\"" << value->get_name() << "\")" << endl;
+        f_impl_ << indent() << "case ." << enum_value_name(value) << ": return \"" << value->get_name() << "\"" << endl;
       }
       f_impl_ << indent() << "}" << endl;
     }
@@ -733,8 +742,36 @@ void t_swift_generator::generate_swift_struct_implementation(ofstream& out,
   }
   if (telemetry_object_) {
     generate_swift_struct_telemetry_object_extension(out, tstruct);
+    generate_swift_struct_telemetry_event_extension(out, tstruct);
   }
   out << endl << endl;
+}
+
+/**
+ * Generate the TelemetryEvent protocol implementation
+ *
+ * @param tstruct The structure definition
+ */
+void t_swift_generator::generate_swift_struct_telemetry_event_extension(ofstream& out, t_struct* tstruct) {
+  bool contains_event_name = false;
+
+  for (const auto& member : tstruct->get_members()) {
+    if (member->get_name() == "event_name") {
+      contains_event_name = true;
+      break;
+    }
+  }
+
+  if (!contains_event_name) {
+    // This is not an event struct, do not add the protocol
+    return;
+  }
+
+  indent(out) << "extension " << tstruct->get_name() << " : TelemetryEvent";
+  block_open(out);
+  block_close(out);
+
+  out << endl;
 }
 
 /**
@@ -750,7 +787,7 @@ void t_swift_generator::generate_swift_struct_telemetry_object_extension(ofstrea
 
   out << indent() << "public func telemetryDictionary() -> TelemetryDictionary";
   block_open(out);
- 
+
   out << endl;
 
   out << indent() << "var telemetryData = TelemetryDictionary()" << endl;
@@ -764,7 +801,7 @@ void t_swift_generator::generate_swift_struct_telemetry_object_extension(ofstrea
 
     out << indent() << "telemetryData[\"" << member->get_name() << "\"] = ";
     if (member->get_type()->is_enum()) {
-      out << struct_property_name(member) << ".telemetryValue()";
+      out << ".string(" << struct_property_name(member) << ".telemetryName())";
     }
     else {
       out << "TelemetryValue(" << struct_property_name(member) << ")";
@@ -777,7 +814,7 @@ void t_swift_generator::generate_swift_struct_telemetry_object_extension(ofstrea
   }
 
   out << indent() << "return telemetryData" << endl;
-  
+
   block_close(out);
   block_close(out);
 
@@ -2281,7 +2318,7 @@ string t_swift_generator::struct_property_name(t_field* tfield) {
 string t_swift_generator::enum_value_name(t_enum_value* tenumvalue) {
   return maybe_escape_identifier(camel_case_from_underscore(tenumvalue->get_name()));
 }
- 
+
 string t_swift_generator::camel_case_from_underscore(string underscore_name) {
   // Convert to camel case
   std::string cap_value_name = underscore_name;
