@@ -2025,9 +2025,8 @@ void t_swift_generator::render_const_value(ostream& out,
       throw "compiler error: no const of base type " + t_base_type::t_base_name(tbase);
     }
   } else if (type->is_enum()) {
-    out << value->get_identifier();
+    out << type->get_name() << "." << camel_case_from_underscore(value->get_identifier_name());
   } else if (type->is_struct() || type->is_xception()) {
-
     out << type_name(type) << "(";
 
     const vector<t_field*>& fields = ((t_struct*)type)->get_members();
