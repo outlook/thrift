@@ -62,6 +62,7 @@ public:
     debug_descriptions_ = false;
     exclude_thrift_types_ = false;
     telemetry_object_ = false;
+    exclude_empty_init_ = false;
 
     for( iter = parsed_options.begin(); iter != parsed_options.end(); ++iter) {
       if( iter->first.compare("log_unexpected") == 0) {
@@ -76,6 +77,8 @@ public:
         exclude_thrift_types_ = true;
       } else if( iter->first.compare("telemetry_object") == 0) {
         telemetry_object_ = true;
+      } else if( iter->first.compare("exclude_empty_init") == 0) {
+        exclude_empty_init_ = true;
       }
       else {
         throw "unknown option swift:" + iter->first;
@@ -253,6 +256,7 @@ private:
   bool debug_descriptions_;
   bool exclude_thrift_types_;
   bool telemetry_object_;
+  bool exclude_empty_init_;
 
   set<string> swift_reserved_words_;
 };
@@ -423,8 +427,10 @@ void t_swift_generator::generate_enum(t_enum* tenum) {
             << " = " << (*c_iter)->get_value() << endl;
   }
 
-  f_decl_ << endl;
-  f_decl_ << indent() << "public init() { self.init(rawValue: " << constants.front()->get_value() << ")! }" << endl;
+  if (!exclude_empty_init_) {
+    f_decl_ << endl;
+    f_decl_ << indent() << "public init() { self.init(rawValue: " << constants.front()->get_value() << ")! }" << endl;
+  }
 
   block_close(f_decl_);
   f_decl_ << endl;
@@ -557,11 +563,13 @@ void t_swift_generator::generate_swift_struct(ofstream& out,
 
   // init
 
-  indent(out) << visibility << " init()";
-  block_open(out);
-  block_close(out);
+  if (!exclude_empty_init_ || !struct_has_required_fields(tstruct)) {
+    indent(out) << visibility << " init()";
+    block_open(out);
+    block_close(out);
 
-  out << endl;
+    out << endl;
+  }
 
   if (struct_has_required_fields(tstruct)) {
     generate_swift_struct_init(out, tstruct, false, is_private);
@@ -2233,8 +2241,9 @@ string t_swift_generator::declare_property(t_field* tfield, bool is_private) {
     render_const_value(render, type, tfield->get_value());
   }
   else {
-    if (field_is_optional(tfield)) {
-      render << " : " << type_name(tfield->get_type(), true);
+    bool is_optional = field_is_optional(tfield);
+    if (is_optional || exclude_empty_init_) {
+      render << " : " << type_name(tfield->get_type(), is_optional);
     }
     else {
       render << " = " << type_name(tfield->get_type(), false) << "()";
@@ -2461,4 +2470,10 @@ THRIFT_REGISTER_GENERATOR(
     "    debug_descriptions:\n"
     "                     Allow use of debugDescription so the app can add description via a cateogory/extension\n"
     "    async_clients:   Generate clients which invoke asynchronously via block syntax.\n"
-    "    promise_kit:     Generate clients which invoke asynchronously via promises.\n")
+    "    promise_kit:     Generate clients which invoke asynchronously via promises.\n"
+    "    exclude_thrift_types:\n"
+    "                     Do not use Thrift types in the generated code\n"
+    "    telemetry_object:\n"
+    "                     Create protocols in order to send a dictionary of values for telemetry.\n"
+    "    exclude_empty_init:\n"
+    "                     Do not generate empty initializers\n")
