@@ -28,7 +28,9 @@
 #include <sstream>
 #include "thrift/platform.h"
 #include "thrift/generate/t_oop_generator.h"
+#include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/replace.hpp>
+#include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 
 using std::map;
@@ -116,6 +118,8 @@ public:
   void render_const_value(ostream& out,
                           t_type* type,
                           t_const_value* value);
+  void print_doc(ostream& out, t_doc* tdoc, bool should_indent);
+  void print_struct_init_doc(ostream& out, t_struct* tstruct, const vector<t_field*>& fields, bool all);
 
   void generate_swift_struct(ofstream& out,
                              t_struct* tstruct,
@@ -416,6 +420,8 @@ void t_swift_generator::generate_typedef(t_typedef* ttypedef) {
  * @param tenum The enumeration
  */
 void t_swift_generator::generate_enum(t_enum* tenum) {
+  print_doc(f_decl_, tenum, false);
+
   f_decl_ << indent() << "public enum " << tenum->get_name() << " : Int32";
   block_open(f_decl_);
 
@@ -423,6 +429,7 @@ void t_swift_generator::generate_enum(t_enum* tenum) {
   vector<t_enum_value*>::iterator c_iter;
 
   for (c_iter = constants.begin(); c_iter != constants.end(); ++c_iter) {
+    print_doc(f_decl_, *c_iter, true);
     f_decl_ << indent() << "case " << enum_value_name(*c_iter)
             << " = " << (*c_iter)->get_value() << endl;
   }
@@ -539,6 +546,7 @@ void t_swift_generator::generate_xception(t_struct* txception) {
 void t_swift_generator::generate_swift_struct(ofstream& out,
                                               t_struct* tstruct,
                                               bool is_private) {
+  print_doc(out, tstruct, false);
 
   string visibility = is_private ? "private" : "public";
 
@@ -556,7 +564,7 @@ void t_swift_generator::generate_swift_struct(ofstream& out,
 
   for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
     out << endl;
-    out << indent() << declare_property(*m_iter, is_private) << endl;
+    out << declare_property(*m_iter, is_private) << endl;
   }
 
   out << endl;
@@ -596,11 +604,14 @@ void t_swift_generator::generate_swift_struct_init(ofstream& out,
                                                    bool all,
                                                    bool is_private) {
 
+  const vector<t_field*>& members = tstruct->get_members();
+
+  print_struct_init_doc(out, tstruct, members, all);
+
   string visibility = is_private ? "private" : "public";
 
   indent(out) << visibility << " init(";
 
-  const vector<t_field*>& members = tstruct->get_members();
   vector<t_field*>::const_iterator m_iter;
 
   bool first=true;
@@ -2223,17 +2234,113 @@ void t_swift_generator::render_const_value(ostream& out,
 }
 
 /**
+ * If the provided documentable object has documentation attached, this
+ * will emit it to the output stream.
+ */
+void t_swift_generator::print_doc(ostream& out, t_doc* tdoc, bool should_indent) {
+  if (!tdoc->has_doc()) {
+    return;
+  }
+
+  vector<string> strs;
+  boost::split(strs, tdoc->get_doc(), boost::is_any_of("\n"));
+
+  if (should_indent) {
+    out << indent();
+  }
+  out << "/**" << endl;
+
+  for (size_t i = 0; i < strs.size(); i++) {
+    if (strs[i].length() == 0 || strs[i] == "\n") {
+      continue;
+    }
+
+    if (should_indent) {
+      out << indent();
+    }
+    out << " " << strs[i] << endl;
+  }
+
+  if (should_indent) {
+    out << indent();
+  }
+  out << " */" << endl;
+}
+
+/**
+ * If the provided struct has documentation attached, this
+ * will emit it and its parameters to the output stream.
+ */
+void t_swift_generator::print_struct_init_doc(ostream& out, t_struct* tstruct, const vector<t_field*>& fields, bool all) {
+  bool any_field_has_doc = false;
+  vector<t_field*>::const_iterator f_iter;
+  for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
+    if ((*f_iter)->has_doc()) {
+      any_field_has_doc = true;
+      break;
+    }
+  }
+
+  if (!tstruct->has_doc() && !any_field_has_doc) {
+    return;
+  }
+
+  vector<string> struct_docs;
+  boost::split(struct_docs, tstruct->get_doc(), boost::is_any_of("\n"));
+
+  out << indent() << "/**" << endl;
+
+  for (size_t i = 0; i < struct_docs.size(); i++) {
+    if (struct_docs[i].length() == 0 || struct_docs[i] == "\n") {
+      continue;
+    }
+
+    out << indent() << " " << struct_docs[i] << endl;
+  }
+
+  if (any_field_has_doc) {
+    if (tstruct->has_doc()) {
+      out << endl;
+    }
+    out << indent() << " - Parameters:" << endl;
+
+    for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
+      t_field* arg = *f_iter;
+
+      if ((all || !field_is_optional(arg)) && arg->has_doc()) {
+        out << indent() << indent() << " - " << struct_property_name(arg) << ":" << endl;
+
+        vector<string> arg_docs;
+        boost::split(arg_docs, arg->get_doc(), boost::is_any_of("\n"));
+
+        for (size_t i = 0; i < arg_docs.size(); i++) {
+          if (arg_docs[i].length() == 0 || arg_docs[i] == "\n") {
+            continue;
+          }
+
+          out << indent() << indent() << indent() << indent() << " " << arg_docs[i] << endl;
+        }
+      }
+    }
+  }
+
+  out << indent() << " */" << endl;
+}
+
+/**
  * Declares an Swift property.
  *
  * @param tfield The field to declare a property for
  */
 string t_swift_generator::declare_property(t_field* tfield, bool is_private) {
 
-  string visibility = is_private ? "private" : "public";
-
   ostringstream render;
 
-  render << visibility << " var " << struct_property_name(tfield);
+  print_doc(render, tfield, true);
+
+  string visibility = is_private ? "private" : "public";
+
+  render << indent() << visibility << " var " << struct_property_name(tfield);
 
   if (tfield->get_value() != NULL) {
     t_type* type = tfield->get_type();
