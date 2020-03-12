@@ -2248,7 +2248,7 @@ void t_swift_generator::print_doc(ostream& out, t_doc* tdoc, bool should_indent)
   if (should_indent) {
     out << indent();
   }
-  out << "/**\n";
+  out << "/**" << endl;
 
   for (size_t i = 0; i < strs.size(); i++) {
     if (strs[i].length() == 0 || strs[i] == "\n") {
@@ -2288,7 +2288,7 @@ void t_swift_generator::print_struct_init_doc(ostream& out, t_struct* tstruct, c
   vector<string> struct_docs;
   boost::split(struct_docs, tstruct->get_doc(), boost::is_any_of("\n"));
 
-  out << indent() << "/**\n";
+  out << indent() << "/**" << endl;
 
   for (size_t i = 0; i < struct_docs.size(); i++) {
     if (struct_docs[i].length() == 0 || struct_docs[i] == "\n") {
