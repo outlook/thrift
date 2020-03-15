@@ -66,6 +66,7 @@ public:
     telemetry_object_ = false;
     exclude_empty_init_ = false;
     exclude_equatable_ = false;
+    exclude_printable_ = false;
 
     for( iter = parsed_options.begin(); iter != parsed_options.end(); ++iter) {
       if( iter->first.compare("log_unexpected") == 0) {
@@ -82,9 +83,10 @@ public:
         telemetry_object_ = true;
       } else if( iter->first.compare("exclude_empty_init") == 0) {
         exclude_empty_init_ = true;
-      }
       } else if( iter->first.compare("exclude_equatable") == 0) {
         exclude_equatable_ = true;
+      } else if( iter->first.compare("exclude_printable") == 0) {
+        exclude_printable_ = true;
       }
       else {
         throw "unknown option swift:" + iter->first;
@@ -266,6 +268,7 @@ private:
   bool telemetry_object_;
   bool exclude_empty_init_;
   bool exclude_equatable_;
+  bool exclude_printable_;
 
   set<string> swift_reserved_words_;
 };
@@ -759,7 +762,7 @@ void t_swift_generator::generate_swift_struct_implementation(ofstream& out,
     generate_swift_struct_equatable_extension(out, tstruct, is_private);
   }
 
-  if (!is_private && !is_result) {
+  if (!is_private && !is_result && !exclude_printable_) {
     generate_swift_struct_printable_extension(out, tstruct);
   }
 
@@ -2596,3 +2599,5 @@ THRIFT_REGISTER_GENERATOR(
     "                     Do not generate empty initializers\n")
     "    exclude_equatable:\n"
     "                     Do not generate Equatable and Hashable implementations\n")
+    "    exclude_printable:\n"
+    "                     Do not generate CustomStringConvertible implementation\n")
