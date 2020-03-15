@@ -698,7 +698,7 @@ void t_swift_generator::generate_swift_struct_equatable_extension(ofstream& out,
 
   string visibility = is_private ? "private" : "public";
 
-  indent(out) << "extension " << tstruct->get_name() << " : Equatable";
+  indent(out) << "extension " << type_name(tstruct) << " : Equatable";
 
   block_open(out);
 
