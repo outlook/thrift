@@ -698,7 +698,13 @@ void t_swift_generator::generate_swift_struct_equatable_extension(ofstream& out,
 
   string visibility = is_private ? "private" : "public";
 
-  indent(out) << visibility << " func ==(lhs: " << type_name(tstruct) << ", rhs: " << type_name(tstruct) << ") -> Bool";
+  indent(out) << "extension " << tstruct->get_name() << " : Equatable";
+
+  block_open(out);
+
+  out << endl;
+
+  indent(out) << visibility << " static func ==(lhs: " << type_name(tstruct) << ", rhs: " << type_name(tstruct) << ") -> Bool";
 
   block_open(out);
 
@@ -729,6 +735,10 @@ void t_swift_generator::generate_swift_struct_equatable_extension(ofstream& out,
   else {
     out << " true" << endl;
   }
+
+  block_close(out);
+
+  out << endl;
 
   block_close(out);
 
