@@ -2596,8 +2596,8 @@ THRIFT_REGISTER_GENERATOR(
     "    telemetry_object:\n"
     "                     Create protocols in order to send a dictionary of values for telemetry.\n"
     "    exclude_empty_init:\n"
-    "                     Do not generate empty initializers\n")
+    "                     Do not generate empty initializers\n"
     "    exclude_equatable:\n"
-    "                     Do not generate Equatable and Hashable implementations\n")
+    "                     Do not generate Equatable and Hashable implementations\n"
     "    exclude_printable:\n"
     "                     Do not generate CustomStringConvertible implementation\n")
