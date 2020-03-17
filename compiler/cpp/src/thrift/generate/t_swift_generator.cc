@@ -65,6 +65,8 @@ public:
     exclude_thrift_types_ = false;
     telemetry_object_ = false;
     exclude_empty_init_ = false;
+    exclude_equatable_ = false;
+    exclude_printable_ = false;
 
     for( iter = parsed_options.begin(); iter != parsed_options.end(); ++iter) {
       if( iter->first.compare("log_unexpected") == 0) {
@@ -81,6 +83,10 @@ public:
         telemetry_object_ = true;
       } else if( iter->first.compare("exclude_empty_init") == 0) {
         exclude_empty_init_ = true;
+      } else if( iter->first.compare("exclude_equatable") == 0) {
+        exclude_equatable_ = true;
+      } else if( iter->first.compare("exclude_printable") == 0) {
+        exclude_printable_ = true;
       }
       else {
         throw "unknown option swift:" + iter->first;
@@ -261,6 +267,8 @@ private:
   bool exclude_thrift_types_;
   bool telemetry_object_;
   bool exclude_empty_init_;
+  bool exclude_equatable_;
+  bool exclude_printable_;
 
   set<string> swift_reserved_words_;
 };
@@ -750,13 +758,18 @@ void t_swift_generator::generate_swift_struct_implementation(ofstream& out,
                                                              bool is_result,
                                                              bool is_private) {
 
-  generate_swift_struct_equatable_extension(out, tstruct, is_private);
+  if (!exclude_equatable_) {
+    generate_swift_struct_equatable_extension(out, tstruct, is_private);
+  }
 
-  if (!is_private && !is_result) {
+  if (!is_private && !is_result && !exclude_printable_) {
     generate_swift_struct_printable_extension(out, tstruct);
   }
 
-  generate_swift_struct_hashable_extension(out, tstruct, is_private);
+  if (!exclude_equatable_) {
+    generate_swift_struct_hashable_extension(out, tstruct, is_private);
+  }
+
   if (!exclude_thrift_types_) {
     generate_swift_struct_thrift_extension(out, tstruct, is_result, is_private);
   }
@@ -2583,4 +2596,8 @@ THRIFT_REGISTER_GENERATOR(
     "    telemetry_object:\n"
     "                     Create protocols in order to send a dictionary of values for telemetry.\n"
     "    exclude_empty_init:\n"
-    "                     Do not generate empty initializers\n")
+    "                     Do not generate empty initializers\n"
+    "    exclude_equatable:\n"
+    "                     Do not generate Equatable and Hashable implementations\n"
+    "    exclude_printable:\n"
+    "                     Do not generate CustomStringConvertible implementation\n")
