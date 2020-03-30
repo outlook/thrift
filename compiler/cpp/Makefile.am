@@ -45,6 +45,7 @@ plugin_gen = src/thrift/plugin/plugin_types.h \
 compiler_core =  src/thrift/common.h \
                  src/thrift/common.cc \
                  src/thrift/generate/t_generator.cc \
+                 src/thrift/lint/t_linter.cc \
                  src/thrift/generate/t_generator_registry.h \
                  src/thrift/globals.h \
                  src/thrift/platform.h \
@@ -79,6 +80,7 @@ compiler_core =  src/thrift/common.h \
                  src/thrift/parse/t_visitor.h \
                  src/thrift/parse/parse.cc \
                  src/thrift/generate/t_generator.h \
+                 src/thrift/lint/t_linter.h \
                  src/thrift/generate/t_oop_generator.h \
                  src/thrift/generate/t_html_generator.h
 
