@@ -45,4 +45,5 @@ private:
   bool validate_enum_names();
   bool validate_struct_names();
   bool validate_enum_constant_names();
+  bool validate_struct_member_names();
 };
