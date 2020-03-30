@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <iostream>
 #include <regex>
+#include "thrift/parse/t_base_type.h"
 #include "thrift/lint/t_linter.h"
 using namespace std;
 
@@ -307,9 +308,12 @@ bool t_linter::validate_struct_member_names() {
 }
 
 bool t_linter::validate_struct_member_values() {
-  vector<string> struct_exceptions = {};
+  vector<string> struct_exceptions;
 
-  vector<string> exceptions = {};
+  vector<string> exceptions = {
+    "watchAppV2",
+    "OEM_INSTALL",
+  };
 
   std::regex regex(R"(^[a-z0-9_]+$)");
   bool contains_failure = false;
@@ -327,15 +331,33 @@ bool t_linter::validate_struct_member_values() {
     vector<t_field*>::iterator m_iter;
 
     for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
+      t_field* tfield = *m_iter;
 
-      string value = (*m_iter)->get_value()->get_string();
-      if (std::find(exceptions.begin(), exceptions.end(), value) != exceptions.end()) {
+      if (tfield->get_value() == NULL) {
         continue;
       }
 
-      if (!std::regex_match(value, regex)) {
-        cout << "Failed regex for struct member value: " << value << endl;
-        contains_failure = true;
+      if (!tfield->get_type()->is_base_type()) {
+        continue;
+      }
+
+      t_base_type::t_base tbase = ((t_base_type*)tfield->get_type())->get_base();
+      switch (tbase) {
+      case t_base_type::TYPE_STRING:
+        {
+          string value = tfield->get_value()->get_string();
+          if (std::find(exceptions.begin(), exceptions.end(), value) != exceptions.end()) {
+            break;
+          }
+
+          if (!std::regex_match(value, regex)) {
+            cout << "Failed regex for struct member value: " << value << endl;
+            contains_failure = true;
+          }
+          break;
+        }
+      default:
+        break;
       }
     }
   }
