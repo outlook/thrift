@@ -46,6 +46,10 @@ bool t_linter::lint() {
     contains_failure = true;
   }
 
+  if (!validate_struct_member_values()) {
+    contains_failure = true;
+  }
+
   return !contains_failure;
 }
 
@@ -294,6 +298,43 @@ bool t_linter::validate_struct_member_names() {
 
       if (!std::regex_match(name, regex)) {
         cout << "Failed regex for struct member name: " << name << endl;
+        contains_failure = true;
+      }
+    }
+  }
+
+  return !contains_failure;
+}
+
+bool t_linter::validate_struct_member_values() {
+  vector<string> struct_exceptions = {};
+
+  vector<string> exceptions = {};
+
+  std::regex regex(R"(^[a-z0-9_]+$)");
+  bool contains_failure = false;
+
+  const vector<t_struct*>& structs = program_->get_structs();
+  vector<t_struct*>::const_iterator s_iter;
+  for (s_iter = structs.begin(); s_iter != structs.end(); ++s_iter) {
+    t_struct* tstruct = *s_iter;
+
+    if (std::find(struct_exceptions.begin(), struct_exceptions.end(), tstruct->get_name()) != struct_exceptions.end()) {
+      continue;
+    }
+
+    vector<t_field*> members = tstruct->get_members();
+    vector<t_field*>::iterator m_iter;
+
+    for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
+
+      string value = (*m_iter)->get_value()->get_string();
+      if (std::find(exceptions.begin(), exceptions.end(), value) != exceptions.end()) {
+        continue;
+      }
+
+      if (!std::regex_match(value, regex)) {
+        cout << "Failed regex for struct member value: " << value << endl;
         contains_failure = true;
       }
     }
