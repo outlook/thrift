@@ -67,6 +67,7 @@ public:
     exclude_empty_init_ = false;
     exclude_equatable_ = false;
     exclude_printable_ = false;
+    separate_files_ = false;
 
     for( iter = parsed_options.begin(); iter != parsed_options.end(); ++iter) {
       if( iter->first.compare("log_unexpected") == 0) {
@@ -87,6 +88,8 @@ public:
         exclude_equatable_ = true;
       } else if( iter->first.compare("exclude_printable") == 0) {
         exclude_printable_ = true;
+      } else if( iter->first.compare("separate_files") == 0) {
+        separate_files_ = true;
       }
       else {
         throw "unknown option swift:" + iter->first;
@@ -189,6 +192,8 @@ public:
   void generate_swift_service_server_implementation(ofstream& out, t_service* tservice);
   void generate_swift_service_helpers(t_service* tservice);
 
+  void create_file(ofstream& out, string file_name);
+
   /**
    * Helper rendering functions
    */
@@ -260,6 +265,9 @@ private:
   ofstream f_decl_;
   ofstream f_impl_;
 
+  string f_decl_name_;
+  string f_impl_name_;
+
   bool log_unexpected_;
   bool async_clients_;
   bool promise_kit_;
@@ -269,6 +277,7 @@ private:
   bool exclude_empty_init_;
   bool exclude_equatable_;
   bool exclude_printable_;
+  bool separate_files_;
 
   set<string> swift_reserved_words_;
 };
@@ -283,23 +292,13 @@ void t_swift_generator::init_generator() {
 
   populate_reserved_words();
 
-  // we have a .swift declarations file...
-  string f_decl_name = capitalize(program_name_) + ".swift";
-  string f_decl_fullname = get_out_dir() + f_decl_name;
-  f_decl_.open(f_decl_fullname.c_str());
+  // we have a declarations file...
+  f_decl_name_ = get_out_dir() + capitalize(program_name_) + ".swift";
+  create_file(f_decl_, capitalize(program_name_));
 
-  f_decl_ << autogen_comment() << endl;
-
-  f_decl_ << swift_imports() << swift_thrift_imports() << endl;
-
-  // ...and a .swift implementation extensions file
-  string f_impl_name = capitalize(program_name_) + "+Exts.swift";
-  string f_impl_fullname = get_out_dir() + f_impl_name;
-  f_impl_.open(f_impl_fullname.c_str());
-
-  f_impl_ << autogen_comment() << endl;
-
-  f_impl_ << swift_imports() << swift_thrift_imports() << endl;
+  // ...and a implementation extensions file
+  f_impl_name_ = get_out_dir() + capitalize(program_name_) + "+Exts.swift";
+  create_file(f_impl_, capitalize(program_name_) + "+Exts");
 
   if (telemetry_object_) {
     f_impl_ << telemetry_object_protocols() << endl << endl;
@@ -428,70 +427,82 @@ void t_swift_generator::generate_typedef(t_typedef* ttypedef) {
  * @param tenum The enumeration
  */
 void t_swift_generator::generate_enum(t_enum* tenum) {
-  print_doc(f_decl_, tenum, false);
+  ofstream f_enum;
+  if (separate_files_) {
+    create_file(f_enum, tenum->get_name());
+  }
+  else {
+    f_enum.open(f_decl_name_);
+  }
 
-  f_decl_ << indent() << "public enum " << tenum->get_name() << " : Int32";
-  block_open(f_decl_);
+  print_doc(f_enum, tenum, false);
+
+  f_enum << indent() << "public enum " << tenum->get_name() << " : Int32";
+  block_open(f_enum);
 
   vector<t_enum_value*> constants = tenum->get_constants();
   vector<t_enum_value*>::iterator c_iter;
 
   for (c_iter = constants.begin(); c_iter != constants.end(); ++c_iter) {
-    print_doc(f_decl_, *c_iter, true);
-    f_decl_ << indent() << "case " << enum_value_name(*c_iter)
-            << " = " << (*c_iter)->get_value() << endl;
+    print_doc(f_enum, *c_iter, true);
+    f_enum << indent() << "case " << enum_value_name(*c_iter)
+           << " = " << (*c_iter)->get_value() << endl;
   }
 
   if (!exclude_empty_init_) {
-    f_decl_ << endl;
-    f_decl_ << indent() << "public init() { self.init(rawValue: " << constants.front()->get_value() << ")! }" << endl;
+    f_enum << endl;
+    f_enum << indent() << "public init() { self.init(rawValue: " << constants.front()->get_value() << ")! }" << endl;
   }
 
-  block_close(f_decl_);
-  f_decl_ << endl;
+  block_close(f_enum);
+  f_enum << endl;
 
-  f_impl_ << indent() << "extension " << tenum->get_name();
-  if (!exclude_thrift_types_) {
-    f_impl_ << " : TEnum";
+  if (!separate_files_) {
+    f_enum.open(f_impl_name_);
   }
-  block_open(f_impl_);
 
-  f_impl_ << endl;
+  f_enum << indent() << "extension " << tenum->get_name();
+  if (!exclude_thrift_types_) {
+    f_enum << " : TEnum";
+  }
+  block_open(f_enum);
+
+  f_enum << endl;
 
   if (!exclude_thrift_types_) {
-    f_impl_ << indent() << "public static func readValueFromProtocol(proto: TProtocol) throws -> " << tenum->get_name();
-    block_open(f_impl_);
-    f_impl_ << indent() << "var raw = Int32()" << endl
-            << indent() << "try proto.readI32(&raw)" << endl
-            << indent() << "return " << tenum->get_name() << "(rawValue: raw)!" << endl;
-    block_close(f_impl_);
-    f_impl_ << endl;
+    f_enum << indent() << "public static func readValueFromProtocol(proto: TProtocol) throws -> " << tenum->get_name();
+    block_open(f_enum);
+    f_enum << indent() << "var raw = Int32()" << endl
+           << indent() << "try proto.readI32(&raw)" << endl
+           << indent() << "return " << tenum->get_name() << "(rawValue: raw)!" << endl;
+    block_close(f_enum);
+    f_enum << endl;
 
-    f_impl_ << indent() << "public static func writeValue(value: " << tenum->get_name() << ", toProtocol proto: TProtocol) throws";
-    block_open(f_impl_);
-    f_impl_ << indent() << "try proto.writeI32(value.rawValue)" << endl;
-    block_close(f_impl_);
-    f_impl_ << endl;
+    f_enum << indent() << "public static func writeValue(value: " << tenum->get_name() << ", toProtocol proto: TProtocol) throws";
+    block_open(f_enum);
+    f_enum << indent() << "try proto.writeI32(value.rawValue)" << endl;
+    block_close(f_enum);
+    f_enum << endl;
   }
 
   if (telemetry_object_) {
-    f_impl_ << indent() << "public func telemetryName() -> String";
-    block_open(f_impl_);
+    f_enum << indent() << "public func telemetryName() -> String";
+    block_open(f_enum);
     if (boost::algorithm::ends_with(tenum->get_name(), "AsInt")) {
-      f_impl_ << indent() << "return \"\\(rawValue)\"" << endl;
+      f_enum << indent() << "return \"\\(rawValue)\"" << endl;
     }
     else {
-      f_impl_ << indent() << "switch self {" << endl;
+      f_enum << indent() << "switch self {" << endl;
       for (const auto& value : tenum->get_constants()) {
-        f_impl_ << indent() << "case ." << enum_value_name(value) << ": return \"" << value->get_name() << "\"" << endl;
+        f_enum << indent() << "case ." << enum_value_name(value) << ": return \"" << value->get_name() << "\"" << endl;
       }
-      f_impl_ << indent() << "}" << endl;
+      f_enum << indent() << "}" << endl;
     }
-    block_close(f_impl_);
+    block_close(f_enum);
   }
 
-  block_close(f_impl_);
-  f_impl_ << endl;
+  block_close(f_enum);
+  f_enum << endl;
 }
 
 /**
@@ -2582,6 +2593,18 @@ string t_swift_generator::type_to_enum(t_type* type, bool qualified) {
   throw "INVALID TYPE IN type_to_enum: " + type->get_name();
 }
 
+/**
+ * Creates a file in the output directory with the given name.
+ */
+void t_swift_generator::create_file(ofstream& out, string file_name) {
+  string file_stream_fullname = get_out_dir() + file_name + ".swift";
+  out.open(file_stream_fullname.c_str());
+
+  out << autogen_comment() << endl;
+
+  out << swift_imports() << swift_thrift_imports() << endl;
+}
+
 
 THRIFT_REGISTER_GENERATOR(
     swift,
@@ -2600,4 +2623,5 @@ THRIFT_REGISTER_GENERATOR(
     "    exclude_equatable:\n"
     "                     Do not generate Equatable and Hashable implementations\n"
     "    exclude_printable:\n"
-    "                     Do not generate CustomStringConvertible implementation\n")
+    "                     Do not generate CustomStringConvertible implementation\n"
+    "    separate_files:  Create a separate file for each type\n")
