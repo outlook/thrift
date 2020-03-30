@@ -540,8 +540,21 @@ void t_swift_generator::generate_consts(vector<t_const*> consts) {
  * @param tstruct The struct definition
  */
 void t_swift_generator::generate_struct(t_struct* tstruct) {
-  generate_swift_struct(f_decl_, tstruct, false);
-  generate_swift_struct_implementation(f_impl_, tstruct, false, false);
+  ofstream f_struct;
+  if (separate_files_) {
+    create_file(f_struct, tstruct->get_name());
+  }
+  else {
+    f_struct.open(f_decl_name_);
+  }
+
+  generate_swift_struct(f_struct, tstruct, false);
+
+  if (!separate_files_) {
+    f_struct.open(f_impl_name_);
+  }
+
+  generate_swift_struct_implementation(f_struct, tstruct, false, false);
 }
 
 /**
