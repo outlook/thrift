@@ -333,7 +333,7 @@ public enum TelemetryValue: Equatable {
   case bool(Bool)
   case dictionary(TelemetryDictionary)
 
-  fileprivate init(_ value: Any) {
+  init(_ value: Any) {
     if let string = value as? String {
       self = .string(string)
     }
