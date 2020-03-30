@@ -41,4 +41,6 @@ private:
    * The program being generated
    */
   t_program* program_;
+
+  bool validate_enum_name();
 };

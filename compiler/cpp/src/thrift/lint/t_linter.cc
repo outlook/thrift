@@ -17,6 +17,8 @@
  * under the License.
  */
 
+#include <iostream>
+#include <regex>
 #include "thrift/lint/t_linter.h"
 using namespace std;
 
@@ -25,6 +27,29 @@ using namespace std;
  * Returns true if lints
  */
 bool t_linter::lint() {
-  fprintf(stdout, "linting");
-  return true;
+  bool contains_failure = false;
+
+  if (!validate_enum_name()) {
+    contains_failure = true;
+  }
+
+  return contains_failure;
+}
+
+bool t_linter::validate_enum_name() {
+  std::regex regex(R"(^OT\w*)");
+  bool contains_failure = false;
+
+  const vector<t_enum*>& enums = program_->get_enums();
+  vector<t_enum*>::const_iterator e_iter;
+  for (e_iter = enums.begin(); e_iter != enums.end(); ++e_iter) {
+    t_enum* en = *e_iter;
+
+    if (!std::regex_match(en->get_name(), regex)) {
+      cout << "Failed regex for name: " << en->get_name() << endl;
+      contains_failure = true;
+    }
+  }
+
+  return contains_failure;
 }
