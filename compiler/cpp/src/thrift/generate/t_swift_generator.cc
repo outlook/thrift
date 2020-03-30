@@ -563,8 +563,21 @@ void t_swift_generator::generate_struct(t_struct* tstruct) {
  * @param tstruct The struct definition
  */
 void t_swift_generator::generate_xception(t_struct* txception) {
-  generate_swift_struct(f_decl_, txception, false);
-  generate_swift_struct_implementation(f_impl_, txception, false, false);
+  ofstream f_xception;
+  if (separate_files_) {
+    create_file(f_xception, txception->get_name());
+  }
+  else {
+    f_xception.open(f_decl_name_);
+  }
+
+  generate_swift_struct(f_xception, txception, false);
+
+  if (!separate_files_) {
+    f_xception.open(f_impl_name_);
+  }
+
+  generate_swift_struct_implementation(f_xception, txception, false, false);
 }
 
 /**
@@ -1245,6 +1258,13 @@ void t_swift_generator::generate_swift_struct_printable_extension(ofstream& out,
  * @param tservice The service definition
  */
 void t_swift_generator::generate_service(t_service* tservice) {
+  ofstream f_xception;
+  if (separate_files_) {
+    create_file(f_xception, tservice->get_name());
+  }
+  else {
+    f_xception.open(f_impl_name_);
+  }
 
   generate_swift_service_protocol(f_decl_, tservice);
   generate_swift_service_client(f_decl_, tservice);
@@ -1256,11 +1276,11 @@ void t_swift_generator::generate_service(t_service* tservice) {
 
   generate_swift_service_helpers(tservice);
 
-  generate_swift_service_client_implementation(f_impl_, tservice);
+  generate_swift_service_client_implementation(f_xception, tservice);
   if (async_clients_) {
-    generate_swift_service_client_async_implementation(f_impl_, tservice);
+    generate_swift_service_client_async_implementation(f_xception, tservice);
   }
-  generate_swift_service_server_implementation(f_impl_, tservice);
+  generate_swift_service_server_implementation(f_xception, tservice);
 }
 
 /**
@@ -1269,6 +1289,14 @@ void t_swift_generator::generate_service(t_service* tservice) {
  * @param tservice The service
  */
 void t_swift_generator::generate_swift_service_helpers(t_service* tservice) {
+  ofstream f_service;
+  if (separate_files_) {
+    create_file(f_service, tservice->get_name());
+  }
+  else {
+    f_service.open(f_impl_name_);
+  }
+
   vector<t_function*> functions = tservice->get_functions();
   vector<t_function*>::iterator f_iter;
   for (f_iter = functions.begin(); f_iter != functions.end(); ++f_iter) {
@@ -1285,8 +1313,8 @@ void t_swift_generator::generate_swift_service_helpers(t_service* tservice) {
       qname_ts.append(*m_iter);
     }
 
-    generate_swift_struct(f_impl_, &qname_ts, true);
-    generate_swift_struct_implementation(f_impl_, &qname_ts, false, true);
+    generate_swift_struct(f_service, &qname_ts, true);
+    generate_swift_struct_implementation(f_service, &qname_ts, false, true);
     generate_function_helpers(tservice, *f_iter);
   }
 }
@@ -1313,6 +1341,14 @@ void t_swift_generator::generate_function_helpers(t_service *tservice, t_functio
     return;
   }
 
+  ofstream f_service;
+  if (separate_files_) {
+    create_file(f_service, tservice->get_name());
+  }
+  else {
+    f_service.open(f_impl_name_);
+  }
+
   // create a result struct with a success field of the return type,
   // and a field for each type of exception thrown
   t_struct result(program_, function_result_helper_struct_type(tservice, tfunction));
@@ -1333,8 +1369,8 @@ void t_swift_generator::generate_function_helpers(t_service *tservice, t_functio
   }
 
   // generate the result struct
-  generate_swift_struct(f_impl_, &result, true);
-  generate_swift_struct_implementation(f_impl_, &result, true, true);
+  generate_swift_struct(f_service, &result, true);
+  generate_swift_struct_implementation(f_service, &result, true, true);
 
   for (f_iter = result.get_members().begin(); f_iter != result.get_members().end(); ++f_iter) {
     delete *f_iter;
