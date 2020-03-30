@@ -42,5 +42,7 @@ private:
    */
   t_program* program_;
 
-  bool validate_enum_name();
+  bool validate_enum_names();
+  bool validate_struct_names();
+  bool validate_enum_constant_names();
 };

@@ -29,14 +29,22 @@ using namespace std;
 bool t_linter::lint() {
   bool contains_failure = false;
 
-  if (!validate_enum_name()) {
+  if (!validate_enum_names()) {
     contains_failure = true;
   }
 
-  return contains_failure;
+  if (!validate_struct_names()) {
+    contains_failure = true;
+  }
+
+  if (!validate_enum_constant_names()) {
+    contains_failure = true;
+  }
+
+  return !contains_failure;
 }
 
-bool t_linter::validate_enum_name() {
+bool t_linter::validate_enum_names() {
   std::regex regex(R"(^OT\w*)");
   bool contains_failure = false;
 
@@ -46,10 +54,52 @@ bool t_linter::validate_enum_name() {
     t_enum* en = *e_iter;
 
     if (!std::regex_match(en->get_name(), regex)) {
-      cout << "Failed regex for name: " << en->get_name() << endl;
+      cout << "Failed regex for enum name: " << en->get_name() << endl;
       contains_failure = true;
     }
   }
 
-  return contains_failure;
+  return !contains_failure;
+}
+
+bool t_linter::validate_struct_names() {
+  std::regex regex(R"(^OT\w*)");
+  bool contains_failure = false;
+
+  const vector<t_enum*>& enums = program_->get_enums();
+  vector<t_enum*>::const_iterator e_iter;
+  for (e_iter = enums.begin(); e_iter != enums.end(); ++e_iter) {
+    t_enum* en = *e_iter;
+
+    if (!std::regex_match(en->get_name(), regex)) {
+      cout << "Failed regex for enum name: " << en->get_name() << endl;
+      contains_failure = true;
+    }
+  }
+
+  return !contains_failure;
+}
+
+bool t_linter::validate_enum_constant_names() {
+  std::regex regex(R"(^[a-z0-9_]+$)");
+  bool contains_failure = false;
+
+  const vector<t_enum*>& enums = program_->get_enums();
+  vector<t_enum*>::const_iterator e_iter;
+  for (e_iter = enums.begin(); e_iter != enums.end(); ++e_iter) {
+    t_enum* en = *e_iter;
+
+    vector<t_enum_value*> constants = en->get_constants();
+    vector<t_enum_value*>::iterator c_iter;
+
+    for (c_iter = constants.begin(); c_iter != constants.end(); ++c_iter) {
+
+      if (!std::regex_match((*c_iter)->get_name(), regex)) {
+        cout << "Failed regex for enum constant name: " << (*c_iter)->get_name() << endl;
+        contains_failure = true;
+      }
+    }
+  }
+
+  return !contains_failure;
 }
