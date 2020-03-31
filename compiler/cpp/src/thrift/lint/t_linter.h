@@ -20,6 +20,11 @@
 #include <algorithm>
 #include <regex>
 #include "thrift/parse/t_program.h"
+
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
+
+namespace pt = boost::property_tree;
 using namespace std;
 
 /**
@@ -27,8 +32,9 @@ using namespace std;
  */
 class t_linter {
 public:
-  t_linter(t_program* program) {
+  t_linter(t_program* program, string lint_file) {
     program_ = program;
+    lint_file_ = lint_file;
   }
 
   virtual ~t_linter() {}
@@ -45,16 +51,20 @@ private:
    */
   t_program* program_;
 
-  bool validate_enum_names();
-  bool validate_struct_names();
-  bool validate_enum_constant_names();
-  bool validate_struct_member_names();
-  bool validate_struct_member_values();
+  string lint_file_;
+
+  bool validate_enum_names(string raw_regex, set<string> enum_exceptions);
+  bool validate_struct_names(string raw_regex, set<string> struct_exceptions);
+  bool validate_enum_constant_names(string raw_regex, set<string> enum_exceptions, set<string> exceptions);
+  bool validate_struct_member_names(string raw_regex, set<string> struct_exceptions, set<string> exceptions);
+  bool validate_struct_member_values(string raw_regex, set<string> struct_exceptions, set<string> exceptions);
 
   bool validate_override_struct_member_names();
   bool validate_override_struct_member_names(
-    regex regex,
     t_struct* tstruct,
     map<string, string> member_name_by_struct_exceptions,
     map<string, string> member_name_by_struct);
+
+  template<typename T>
+  set<T> as_set(pt::ptree pt, string key);
 };

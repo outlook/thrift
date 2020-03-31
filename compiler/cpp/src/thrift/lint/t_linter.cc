@@ -28,41 +28,83 @@
 bool t_linter::lint() {
   bool contains_failure = false;
 
-  if (!validate_enum_names()) {
-    contains_failure = true;
-  }
+  pt::ptree lint_file_root;
+  pt::read_json(lint_file_, lint_file_root);
 
-  if (!validate_struct_names()) {
-    contains_failure = true;
-  }
+  // Iterator over all rules
+  for (auto& rule : lint_file_root.get_child("rules")) {
+    string lint_name = rule.second.get<string>("name");
+    auto regex = rule.second.get_optional<string>("regex");
 
-  if (!validate_enum_constant_names()) {
-    contains_failure = true;
-  }
+    set<string> enum_exceptions = as_set<string>(rule.second, "enum_exceptions");
+    set<string> struct_exceptions = as_set<string>(rule.second, "struct_exceptions");
+    set<string> exceptions = as_set<string>(rule.second, "exceptions");
 
-  if (!validate_struct_member_names()) {
-    contains_failure = true;
-  }
+    if (lint_name == "enum_name") {
+      if (!regex) {
+        failure("Should have provided regex for enum_name");
+      }
 
-  if (!validate_struct_member_values()) {
-    contains_failure = true;
-  }
+      if (!validate_enum_names(*regex, enum_exceptions)) {
+        contains_failure = true;
+      }
+    } else if (lint_name == "enum_constant_name") {
+      if (!regex) {
+        failure("Should have provided regex for enum_constant_name");
+      }
 
-  if (!validate_override_struct_member_names()) {
-    contains_failure = true;
+      if (!validate_enum_constant_names(*regex, enum_exceptions, exceptions)) {
+        contains_failure = true;
+      }
+    } else if (lint_name == "struct_name") {
+      if (!regex) {
+        failure("Should have provided regex for struct_name");
+      }
+
+      if (!validate_struct_names(*regex, struct_exceptions)) {
+        contains_failure = true;
+      }
+    } else if (lint_name == "struct_member_name") {
+      if (!regex) {
+        failure("Should have provided regex for struct_member_name");
+      }
+
+      if (!validate_struct_member_names(*regex, struct_exceptions, exceptions)) {
+        contains_failure = true;
+      }
+    } else if (lint_name == "struct_member_value") {
+      if (!regex) {
+        failure("Should have provided regex for struct_member_value");
+      }
+
+      if (!validate_struct_member_values(*regex, struct_exceptions, exceptions)) {
+        contains_failure = true;
+      }
+    } else if (lint_name == "override_struct_member") {
+      if (!validate_override_struct_member_names()) {
+        contains_failure = true;
+      }
+    }
+    else {
+      failure("Unknown lint name: ", lint_name);
+    }
   }
 
   return !contains_failure;
 }
 
-bool t_linter::validate_enum_names() {
-  std::regex regex(R"(^OT\w*)");
+bool t_linter::validate_enum_names(string raw_regex, set<string> enum_exceptions) {
+  std::regex regex(raw_regex);
   bool contains_failure = false;
 
   const vector<t_enum*>& enums = program_->get_enums();
   vector<t_enum*>::const_iterator e_iter;
   for (e_iter = enums.begin(); e_iter != enums.end(); ++e_iter) {
     t_enum* en = *e_iter;
+
+    if (enum_exceptions.find(en->get_name()) != enum_exceptions.end()) {
+      continue;
+    }
 
     if (!std::regex_match(en->get_name(), regex)) {
       cerr << "Failed regex for enum name: " << en->get_name() << endl;
@@ -73,14 +115,18 @@ bool t_linter::validate_enum_names() {
   return !contains_failure;
 }
 
-bool t_linter::validate_struct_names() {
-  std::regex regex(R"(^OT\w*)");
+bool t_linter::validate_struct_names(string raw_regex, set<string> struct_exceptions) {
+  std::regex regex(raw_regex);
   bool contains_failure = false;
 
   const vector<t_struct*>& structs = program_->get_structs();
   vector<t_struct*>::const_iterator s_iter;
   for (s_iter = structs.begin(); s_iter != structs.end(); ++s_iter) {
     t_struct* tstruct = *s_iter;
+
+    if (struct_exceptions.find(tstruct->get_name()) != struct_exceptions.end()) {
+      continue;
+    }
 
     if (!std::regex_match(tstruct->get_name(), regex)) {
       cerr << "Failed regex for struct name: " << tstruct->get_name() << endl;
@@ -91,118 +137,8 @@ bool t_linter::validate_struct_names() {
   return !contains_failure;
 }
 
-bool t_linter::validate_enum_constant_names() {
-  set<string> enum_exceptions = {
-    "OTPrivacyLevel",
-    "OTDiagnosticConsentLevelAsInt",
-    "OTPrivacyServiceStateAsInt",
-    "OTPrivacySettingSourceLocationAsInt",
-    "OTPrivacyIdentitySpace",
-    "OTCIDType",
-    "OTAccountType",
-    "OTAccountCloud",
-    "OTFolderType",
-    "OTPrivacyAccountType",
-    "OTPrivacySettingsAction",
-    "OTPrivacySettingsResult",
-    "OTPrivacySettingType",
-    "OTPrivacyRoamingService",
-    "OTPrivacySettingsFailureReason",
-  };
-
-  set<string> exceptions = {
-    "underSubmit",
-    "bottomOfScreen",
-    "actionCard",
-    "hideAd",
-    "GROUPS",
-    "OTHER",
-    "GROUP",
-    "OTHER",
-    "fileDetails",
-    "unifiedInboxHeader",
-    "singleInboxHeader",
-    "keyStroke",
-    "NoResponse",
-    "Organizer",
-    "Tentative",
-    "Accepted",
-    "Declined",
-    "ProposedNewTime",
-    "Accept",
-    "Reply",
-    "Edit",
-    "NoResponse",
-    "Folder",
-    "Group",
-    "Persona",
-    "Unknown",
-    "missing_xAnchor_mailbox",
-    "Mail",
-    "Calendar",
-    "clearButton",
-    "contextChanged",
-    "keyboardInput",
-    "zeroQuery",
-    "includeDeletedToggle",
-    "voiceAssistant",
-    "spellerSuggestion",
-    "closedWithSearch",
-    "closedWithoutSearch",
-    "closedWithTimeout",
-    "closedWithError",
-    "deniedPermissions",
-    "latencyDiffFirstWord",
-    "startedListening",
-    "microphoneShown",
-    "initializingStateShown",
-    "peoplePhone",
-    "peopleEmail",
-    "peopleOfficeLocation",
-    "MFU",
-    "MRU",
-    "microsoftGraph",
-    "lokiAccessToken",
-    "substrateToken",
-    "cortanaToken",
-    "featureAwareness",
-    "newAccount",
-    "changeServerSettings",
-    "timeoutError",
-    "authenticationError",
-    "unknownError",
-    "qrIntroShown",
-    "qrIntroScanQrCode",
-    "qrIntroSignInManually",
-    "qrScanShown",
-    "qrScanSignInManually",
-    "qrScanSuccess",
-    "qrScanFail",
-    "lensSDK_camera",
-    "enterBackgroundEarly",
-    "remoteNotification",
-    "significantTimeChange",
-    "backgroundFetch",
-    "archiveAndMarkAsRead",
-    "messageDetail",
-    "messageListBulkAction",
-    "messageListSwipe",
-    "ComposeAttachment",
-    "ComposeInline",
-    "ComposeRecipient",
-    "Attachment",
-    "MessagesList",
-    "MessageListInSearchResults",
-    "FilePicker",
-    "FilesInZeroQuery",
-    "EventsAgendaView",
-    "EventsDayView",
-    "ContactsInZeroQuery",
-    "PeopleList",
-    "BE",
-    "FE",
-  };
-  std::regex regex(R"(^[a-z0-9_]+$)");
+bool t_linter::validate_enum_constant_names(string raw_regex, set<string> enum_exceptions, set<string> exceptions) {
+  std::regex regex(raw_regex);
   bool contains_failure = false;
 
   const vector<t_enum*>& enums = program_->get_enums();
@@ -234,49 +170,8 @@ bool t_linter::validate_enum_constant_names() {
   return !contains_failure;
 }
 
-bool t_linter::validate_struct_member_names() {
-  set<string> struct_exceptions = {
-    "OTPrivacyTags",
-    "OTPrivacyConsentNonAADProperties",
-    "OTPrivacyConsentAADProperties",
-    "OTPrivacyConsentEvent",
-    "OTPrivacySettingsEvent",
-    "OTBootTimeEvent",
-  };
-
-  set<string> exceptions = {
-    "DiagnosticPrivacyLevel",
-    "byteCount",
-    "reachabilityType",
-    "unselectedMessageAction",
-    "taskId",
-    "otherInboxAdsData",
-    "is_IRM_protected",
-    "clientName",
-    "cloudFile_response_data",
-    "smimeCertType",
-    "isHxAccount",
-    "traceID",
-    "logicalID",
-    "AccountType",
-    "num_accounts_in_DB",
-    "errorDescription",
-    "createAccount",
-    "authType",
-    "currentVC",
-    "sqlError",
-    "errorSource",
-    "incidentIdentifier",
-    "reporterKey",
-    "exceptionName",
-    "crashTime",
-    "isAppKill",
-    "memoAry_used_percentage",
-    "systemFlagSet",
-    "glEsVersion",
-  };
-
-  std::regex regex(R"(^[a-z0-9_]+$)");
+bool t_linter::validate_struct_member_names(string raw_regex, set<string> struct_exceptions, set<string> exceptions) {
+  std::regex regex(raw_regex);
   bool contains_failure = false;
 
   const vector<t_struct*>& structs = program_->get_structs();
@@ -308,15 +203,8 @@ bool t_linter::validate_struct_member_names() {
   return !contains_failure;
 }
 
-bool t_linter::validate_struct_member_values() {
-  set<string> struct_exceptions;
-
-  set<string> exceptions = {
-    "watchAppV2",
-    "OEM_INSTALL",
-  };
-
-  std::regex regex(R"(^[a-z0-9_]+$)");
+bool t_linter::validate_struct_member_values(string raw_regex, set<string> struct_exceptions, set<string> exceptions) {
+  std::regex regex(raw_regex);
   bool contains_failure = false;
 
   const vector<t_struct*>& structs = program_->get_structs();
@@ -371,13 +259,12 @@ bool t_linter::validate_override_struct_member_names() {
     {"OTReadConversation", "orientation"},
   };
 
-  std::regex regex(R"(^[a-z0-9_]+$)");
   bool contains_failure = false;
 
   const vector<t_struct*>& structs = program_->get_structs();
   vector<t_struct*>::const_iterator s_iter;
   for (s_iter = structs.begin(); s_iter != structs.end(); ++s_iter) {
-    if (!validate_override_struct_member_names(regex, *s_iter, struct_member_exceptions, map<string, string>())) {
+    if (!validate_override_struct_member_names(*s_iter, struct_member_exceptions, map<string, string>())) {
       contains_failure = true;
     }
   }
@@ -386,10 +273,9 @@ bool t_linter::validate_override_struct_member_names() {
 }
 
 bool t_linter::validate_override_struct_member_names(
-  regex regex,
-   t_struct* tstruct,
-   map<string, string> member_name_by_struct_exceptions,
-   map<string, string> member_name_by_struct) {
+  t_struct* tstruct,
+  map<string, string> member_name_by_struct_exceptions,
+  map<string, string> member_name_by_struct) {
 
   bool contains_failure = false;
 
@@ -426,10 +312,25 @@ bool t_linter::validate_override_struct_member_names(
 
     t_struct* sub_struct = (t_struct*)field->get_type();
 
-    if (!validate_override_struct_member_names(regex, sub_struct, member_name_by_struct_exceptions, member_name_by_struct)) {
+    if (!validate_override_struct_member_names(sub_struct, member_name_by_struct_exceptions, member_name_by_struct)) {
       contains_failure = true;
     }
   }
 
   return !contains_failure;
+}
+
+template<typename T>
+set<T> t_linter::as_set(pt::ptree pt, string key) {
+  set<T> s;
+
+  auto value = pt.get_child_optional(key);
+  if (!value) {
+    return s;
+  }
+
+  for (auto& item : *value) {
+    s.insert(item.second.get_value<T>());
+  }
+  return s;
 }
