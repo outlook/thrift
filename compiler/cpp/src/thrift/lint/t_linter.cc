@@ -65,7 +65,7 @@ bool t_linter::validate_enum_names() {
     t_enum* en = *e_iter;
 
     if (!std::regex_match(en->get_name(), regex)) {
-      cout << "Failed regex for enum name: " << en->get_name() << endl;
+      cerr << "Failed regex for enum name: " << en->get_name() << endl;
       contains_failure = true;
     }
   }
@@ -77,13 +77,13 @@ bool t_linter::validate_struct_names() {
   std::regex regex(R"(^OT\w*)");
   bool contains_failure = false;
 
-  const vector<t_enum*>& enums = program_->get_enums();
-  vector<t_enum*>::const_iterator e_iter;
-  for (e_iter = enums.begin(); e_iter != enums.end(); ++e_iter) {
-    t_enum* en = *e_iter;
+  const vector<t_struct*>& structs = program_->get_structs();
+  vector<t_struct*>::const_iterator s_iter;
+  for (s_iter = structs.begin(); s_iter != structs.end(); ++s_iter) {
+    t_struct* tstruct = *s_iter;
 
-    if (!std::regex_match(en->get_name(), regex)) {
-      cout << "Failed regex for enum name: " << en->get_name() << endl;
+    if (!std::regex_match(tstruct->get_name(), regex)) {
+      cerr << "Failed regex for struct name: " << tstruct->get_name() << endl;
       contains_failure = true;
     }
   }
@@ -225,7 +225,7 @@ bool t_linter::validate_enum_constant_names() {
       }
 
       if (!std::regex_match(name, regex)) {
-        cout << "Failed regex for enum constant name: " << name << endl;
+        cerr << "Failed regex for enum constant name: " << name << endl;
         contains_failure = true;
       }
     }
@@ -299,7 +299,7 @@ bool t_linter::validate_struct_member_names() {
       }
 
       if (!std::regex_match(name, regex)) {
-        cout << "Failed regex for struct member name: " << name << endl;
+        cerr << "Failed regex for struct member name: " << name << endl;
         contains_failure = true;
       }
     }
@@ -352,7 +352,7 @@ bool t_linter::validate_struct_member_values() {
           }
 
           if (!std::regex_match(value, regex)) {
-            cout << "Failed regex for struct member value: " << value << endl;
+            cerr << "Failed regex for struct member value: " << value << endl;
             contains_failure = true;
           }
           break;
@@ -367,8 +367,8 @@ bool t_linter::validate_struct_member_values() {
 }
 
 bool t_linter::validate_override_struct_member_names() {
-  set<tuple<string, string>> struct_member_exceptions = {
-    tuple<string, string>("OTReadConversation", "orientation")
+  map<string, string> struct_member_exceptions = {
+    {"OTReadConversation", "orientation"},
   };
 
   std::regex regex(R"(^[a-z0-9_]+$)");
@@ -388,7 +388,7 @@ bool t_linter::validate_override_struct_member_names() {
 bool t_linter::validate_override_struct_member_names(
   regex regex,
    t_struct* tstruct,
-   set<tuple<string, string>> struct_member_exceptions,
+   map<string, string> member_name_by_struct_exceptions,
    map<string, string> member_name_by_struct) {
 
   bool contains_failure = false;
@@ -400,7 +400,7 @@ bool t_linter::validate_override_struct_member_names(
 
     tuple<string, string> struct_member_tuple = tuple<string, string>(tstruct->get_name(), field->get_name());
 
-    if (struct_member_exceptions.find(struct_member_tuple) != struct_member_exceptions.end()) {
+    if (member_name_by_struct_exceptions.find(tstruct->get_name()) != member_name_by_struct_exceptions.end()) {
       continue;
     }
 
@@ -408,9 +408,9 @@ bool t_linter::validate_override_struct_member_names(
 
     std::map<string, string>::iterator existing_member_name_struct = member_name_by_struct.find(name);
     if (existing_member_name_struct != member_name_by_struct.end()) {
-      cout << "Multiple instances member value: " << name;
-      cout << " for struct: " << tstruct->get_name();
-      cout << " and struct: " << existing_member_name_struct->second << endl;
+      cerr << "Multiple instances member value: " << name;
+      cerr << ", struct: " << tstruct->get_name();
+      cerr << ", struct: " << existing_member_name_struct->second << endl;
       contains_failure = true;
     }
 
@@ -426,7 +426,7 @@ bool t_linter::validate_override_struct_member_names(
 
     t_struct* sub_struct = (t_struct*)field->get_type();
 
-    if (!validate_override_struct_member_names(regex, sub_struct, struct_member_exceptions, member_name_by_struct)) {
+    if (!validate_override_struct_member_names(regex, sub_struct, member_name_by_struct_exceptions, member_name_by_struct)) {
       contains_failure = true;
     }
   }
