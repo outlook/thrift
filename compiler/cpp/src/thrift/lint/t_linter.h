@@ -67,6 +67,8 @@ private:
 
   bool validate_struct_member_order(set<string> struct_exceptions);
 
+  bool validate_required_before_optional(set<string> struct_exceptions);
+
   template<typename T>
   set<T> as_set(pt::ptree pt, string key);
 

@@ -182,6 +182,9 @@
     },
     {
       "name": "struct_member_order"
+    },
+    {
+      "name": "required_before_optional"
     }
   ]
 }
