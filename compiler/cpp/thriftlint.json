@@ -195,7 +195,7 @@
       "message": "Struct required members should be before optional",
       "struct_exceptions": [
         "OTPropertiesGeneral",
-	      "OTSessionEvent"
+        "OTSessionEvent"
       ]
     }
   ]

@@ -287,6 +287,7 @@ bool t_linter::validate_override_struct_member_names(
 
   bool contains_failure = false;
 
+  // First add all the property keys used in the properties for this struct
   const vector<t_field*>& fields = tstruct->get_members();
   vector<t_field*>::const_iterator f_iter;
   for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
@@ -296,20 +297,47 @@ bool t_linter::validate_override_struct_member_names(
       continue;
     }
 
-    string name = field->get_name();
+    t_type* type = field->get_type()->get_true_type();
+    if (type->is_base_type() || type->is_enum()) {
+      string name = field->get_name();
+      std::map<string, string>::iterator existing_member_name_struct = member_name_by_struct.find(name);
+      if (existing_member_name_struct != member_name_by_struct.end()) {
+        cerr << message;
+        cerr << ", member value: " << name;
+        cerr << ", struct: " << tstruct->get_name();
+        cerr << ", struct: " << existing_member_name_struct->second << endl;
+        contains_failure = true;
+      }
 
-    std::map<string, string>::iterator existing_member_name_struct = member_name_by_struct.find(name);
-    if (existing_member_name_struct != member_name_by_struct.end()) {
-      cerr << message;
-      cerr << ", member value: " << name;
-      cerr << ", struct: " << tstruct->get_name();
-      cerr << ", struct: " << existing_member_name_struct->second << endl;
-      contains_failure = true;
+      member_name_by_struct[name] = tstruct->get_name();
+    } else if (type->is_map()) {
+      t_map* map = (t_map*)type;
+      t_type* key_type = map->get_key_type()->get_true_type();
+
+      // If the key type is not enum, we are not able to determine if there are duplicates
+      if (key_type->is_enum()) {
+        t_enum* enum_key_type = (t_enum*)key_type;
+        vector<t_enum_value*> constants = enum_key_type->get_constants();
+        vector<t_enum_value*>::iterator c_iter;
+
+        for (c_iter = constants.begin(); c_iter != constants.end(); ++c_iter) {
+          string key = (*c_iter)->get_name();
+          std::map<string, string>::iterator existing_member_name_struct = member_name_by_struct.find(key);
+          if (existing_member_name_struct != member_name_by_struct.end()) {
+            cerr << message;
+            cerr << ", member value: " << key;
+            cerr << ", enum: " << enum_key_type->get_name();
+            cerr << ", struct: " << existing_member_name_struct->second << endl;
+            contains_failure = true;
+          }
+
+          member_name_by_struct[key] = enum_key_type->get_name();
+        }
+      }
     }
-
-    member_name_by_struct[name] = tstruct->get_name();
   }
 
+  // Finally check for duplicates in sub-structs
   for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
     t_field* field = *f_iter;
 
