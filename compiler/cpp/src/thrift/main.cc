@@ -1307,7 +1307,7 @@ int main(int argc, char** argv) {
       // Lint it!
       char lf[THRIFT_PATH_MAX];
       if (saferealpath(lint_file.c_str(), lf) == NULL) {
-        failure("Could not open LintFile with realpath: %s", lint_file);
+        failure("Could not open LintFile with realpath: %s", lint_file.c_str());
       }
       string realpath_lint_file(lf);
 
