@@ -17,12 +17,9 @@
  * under the License.
  */
 
-#include <algorithm>
 #include <iostream>
-#include <regex>
 #include "thrift/parse/t_base_type.h"
 #include "thrift/lint/t_linter.h"
-using namespace std;
 
 /**
  * Framework linter method
@@ -48,6 +45,10 @@ bool t_linter::lint() {
   }
 
   if (!validate_struct_member_values()) {
+    contains_failure = true;
+  }
+
+  if (!validate_override_struct_member_names()) {
     contains_failure = true;
   }
 
@@ -91,7 +92,7 @@ bool t_linter::validate_struct_names() {
 }
 
 bool t_linter::validate_enum_constant_names() {
-  vector<string> enum_exceptions = {
+  set<string> enum_exceptions = {
     "OTPrivacyLevel",
     "OTDiagnosticConsentLevelAsInt",
     "OTPrivacyServiceStateAsInt",
@@ -109,7 +110,7 @@ bool t_linter::validate_enum_constant_names() {
     "OTPrivacySettingsFailureReason",
   };
 
-  vector<string> exceptions = {
+  set<string> exceptions = {
     "underSubmit",
     "bottomOfScreen",
     "actionCard",
@@ -209,7 +210,7 @@ bool t_linter::validate_enum_constant_names() {
   for (e_iter = enums.begin(); e_iter != enums.end(); ++e_iter) {
     t_enum* en = *e_iter;
 
-    if (std::find(enum_exceptions.begin(), enum_exceptions.end(), en->get_name()) != enum_exceptions.end()) {
+    if (enum_exceptions.find(en->get_name()) != enum_exceptions.end()) {
       continue;
     }
 
@@ -219,7 +220,7 @@ bool t_linter::validate_enum_constant_names() {
     for (c_iter = constants.begin(); c_iter != constants.end(); ++c_iter) {
 
       string name = (*c_iter)->get_name();
-      if (std::find(exceptions.begin(), exceptions.end(), name) != exceptions.end()) {
+      if (exceptions.find(name) != exceptions.end()) {
         continue;
       }
 
@@ -234,7 +235,7 @@ bool t_linter::validate_enum_constant_names() {
 }
 
 bool t_linter::validate_struct_member_names() {
-  vector<string> struct_exceptions = {
+  set<string> struct_exceptions = {
     "OTPrivacyTags",
     "OTPrivacyConsentNonAADProperties",
     "OTPrivacyConsentAADProperties",
@@ -243,7 +244,7 @@ bool t_linter::validate_struct_member_names() {
     "OTBootTimeEvent",
   };
 
-  vector<string> exceptions = {
+  set<string> exceptions = {
     "DiagnosticPrivacyLevel",
     "byteCount",
     "reachabilityType",
@@ -283,7 +284,7 @@ bool t_linter::validate_struct_member_names() {
   for (s_iter = structs.begin(); s_iter != structs.end(); ++s_iter) {
     t_struct* tstruct = *s_iter;
 
-    if (std::find(struct_exceptions.begin(), struct_exceptions.end(), tstruct->get_name()) != struct_exceptions.end()) {
+    if (struct_exceptions.find(tstruct->get_name()) != struct_exceptions.end()) {
       continue;
     }
 
@@ -293,7 +294,7 @@ bool t_linter::validate_struct_member_names() {
     for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
 
       string name = (*m_iter)->get_name();
-      if (std::find(exceptions.begin(), exceptions.end(), name) != exceptions.end()) {
+      if (exceptions.find(name) != exceptions.end()) {
         continue;
       }
 
@@ -308,9 +309,9 @@ bool t_linter::validate_struct_member_names() {
 }
 
 bool t_linter::validate_struct_member_values() {
-  vector<string> struct_exceptions;
+  set<string> struct_exceptions;
 
-  vector<string> exceptions = {
+  set<string> exceptions = {
     "watchAppV2",
     "OEM_INSTALL",
   };
@@ -323,7 +324,7 @@ bool t_linter::validate_struct_member_values() {
   for (s_iter = structs.begin(); s_iter != structs.end(); ++s_iter) {
     t_struct* tstruct = *s_iter;
 
-    if (std::find(struct_exceptions.begin(), struct_exceptions.end(), tstruct->get_name()) != struct_exceptions.end()) {
+    if (struct_exceptions.find(tstruct->get_name()) != struct_exceptions.end()) {
       continue;
     }
 
@@ -346,8 +347,8 @@ bool t_linter::validate_struct_member_values() {
       case t_base_type::TYPE_STRING:
         {
           string value = tfield->get_value()->get_string();
-          if (std::find(exceptions.begin(), exceptions.end(), value) != exceptions.end()) {
-            break;
+          if (exceptions.find(value) != exceptions.end()) {
+            continue;
           }
 
           if (!std::regex_match(value, regex)) {
@@ -359,6 +360,74 @@ bool t_linter::validate_struct_member_values() {
       default:
         break;
       }
+    }
+  }
+
+  return !contains_failure;
+}
+
+bool t_linter::validate_override_struct_member_names() {
+  set<tuple<string, string>> struct_member_exceptions = {
+    tuple<string, string>("OTReadConversation", "orientation")
+  };
+
+  std::regex regex(R"(^[a-z0-9_]+$)");
+  bool contains_failure = false;
+
+  const vector<t_struct*>& structs = program_->get_structs();
+  vector<t_struct*>::const_iterator s_iter;
+  for (s_iter = structs.begin(); s_iter != structs.end(); ++s_iter) {
+    if (!validate_override_struct_member_names(regex, *s_iter, struct_member_exceptions, map<string, string>())) {
+      contains_failure = true;
+    }
+  }
+
+  return !contains_failure;
+}
+
+bool t_linter::validate_override_struct_member_names(
+  regex regex,
+   t_struct* tstruct,
+   set<tuple<string, string>> struct_member_exceptions,
+   map<string, string> member_name_by_struct) {
+
+  bool contains_failure = false;
+
+  const vector<t_field*>& fields = tstruct->get_members();
+  vector<t_field*>::const_iterator f_iter;
+  for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
+    t_field* field = *f_iter;
+
+    tuple<string, string> struct_member_tuple = tuple<string, string>(tstruct->get_name(), field->get_name());
+
+    if (struct_member_exceptions.find(struct_member_tuple) != struct_member_exceptions.end()) {
+      continue;
+    }
+
+    string name = field->get_name();
+
+    std::map<string, string>::iterator existing_member_name_struct = member_name_by_struct.find(name);
+    if (existing_member_name_struct != member_name_by_struct.end()) {
+      cout << "Multiple instances member value: " << name;
+      cout << " for struct: " << tstruct->get_name();
+      cout << " and struct: " << existing_member_name_struct->second << endl;
+      contains_failure = true;
+    }
+
+    member_name_by_struct[name] = tstruct->get_name();
+  }
+
+  for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
+    t_field* field = *f_iter;
+
+    if (!field->get_type()->is_struct()) {
+      continue;
+    }
+
+    t_struct* sub_struct = (t_struct*)field->get_type();
+
+    if (!validate_override_struct_member_names(regex, sub_struct, struct_member_exceptions, member_name_by_struct)) {
+      contains_failure = true;
     }
   }
 

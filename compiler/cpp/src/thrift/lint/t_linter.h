@@ -17,7 +17,10 @@
  * under the License.
  */
 
+#include <algorithm>
+#include <regex>
 #include "thrift/parse/t_program.h"
+using namespace std;
 
 /**
  * Class for a thrift linter.
@@ -47,4 +50,11 @@ private:
   bool validate_enum_constant_names();
   bool validate_struct_member_names();
   bool validate_struct_member_values();
+
+  bool validate_override_struct_member_names();
+  bool validate_override_struct_member_names(
+    regex regex,
+    t_struct* tstruct,
+    set<tuple<string, string>> struct_member_exceptions,
+    map<string, string> member_name_by_struct);
 };
