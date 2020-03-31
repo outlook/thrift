@@ -2355,13 +2355,17 @@ string t_swift_generator::declare_property(t_field* tfield, bool is_private) {
 
   render << indent() << visibility << " var " << struct_property_name(tfield);
 
+  bool is_optional = field_is_optional(tfield);
+
   if (tfield->get_value() != NULL) {
     t_type* type = tfield->get_type();
+    if (is_optional) {
+      render << " : " << type_name(type, is_optional);
+    }
     render << " = ";
     render_const_value(render, type, tfield->get_value());
   }
   else {
-    bool is_optional = field_is_optional(tfield);
     if (is_optional || exclude_empty_init_) {
       render << " : " << type_name(tfield->get_type(), is_optional);
     }
