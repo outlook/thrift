@@ -67,6 +67,7 @@ public:
     exclude_empty_init_ = false;
     exclude_equatable_ = false;
     exclude_printable_ = false;
+    separate_files_ = false;
 
     for( iter = parsed_options.begin(); iter != parsed_options.end(); ++iter) {
       if( iter->first.compare("log_unexpected") == 0) {
@@ -87,6 +88,8 @@ public:
         exclude_equatable_ = true;
       } else if( iter->first.compare("exclude_printable") == 0) {
         exclude_printable_ = true;
+      } else if( iter->first.compare("separate_files") == 0) {
+        separate_files_ = true;
       }
       else {
         throw "unknown option swift:" + iter->first;
@@ -111,9 +114,13 @@ public:
 
   void generate_typedef(t_typedef* ttypedef);
   void generate_enum(t_enum* tenum);
+  void generate_enum(ofstream& f_enum_decl, ofstream& f_enum_impl, t_enum* tenum);
   void generate_struct(t_struct* tstruct);
+  void generate_struct(ofstream& f_struct_decl, ofstream& f_struct_impl, t_struct* tstruct);
   void generate_xception(t_struct* txception);
+  void generate_xception(ofstream& f_xception_decl, ofstream& f_xception_impl, t_struct* txception);
   void generate_service(t_service* tservice);
+  void generate_service(ofstream& f_service_impl, t_service* tservice);
 
   void print_const_value(ostream& out,
                          string name,
@@ -159,7 +166,7 @@ public:
 
   string function_result_helper_struct_type(t_service *tservice, t_function* tfunction);
   string function_args_helper_struct_type(t_service* tservice, t_function* tfunction);
-  void generate_function_helpers(t_service *tservice, t_function* tfunction);
+  void generate_function_helpers(ofstream& f_service_impl, t_service *tservice, t_function* tfunction);
 
   /**
    * Service-level generation functions
@@ -187,7 +194,9 @@ public:
 
   void generate_swift_service_server(ofstream& out, t_service* tservice);
   void generate_swift_service_server_implementation(ofstream& out, t_service* tservice);
-  void generate_swift_service_helpers(t_service* tservice);
+  void generate_swift_service_helpers(ofstream& f_service_impl, t_service* tservice);
+
+  void create_file(ofstream& out, string file_name);
 
   /**
    * Helper rendering functions
@@ -260,6 +269,9 @@ private:
   ofstream f_decl_;
   ofstream f_impl_;
 
+  string f_decl_name_;
+  string f_impl_name_;
+
   bool log_unexpected_;
   bool async_clients_;
   bool promise_kit_;
@@ -269,6 +281,7 @@ private:
   bool exclude_empty_init_;
   bool exclude_equatable_;
   bool exclude_printable_;
+  bool separate_files_;
 
   set<string> swift_reserved_words_;
 };
@@ -283,23 +296,13 @@ void t_swift_generator::init_generator() {
 
   populate_reserved_words();
 
-  // we have a .swift declarations file...
-  string f_decl_name = capitalize(program_name_) + ".swift";
-  string f_decl_fullname = get_out_dir() + f_decl_name;
-  f_decl_.open(f_decl_fullname.c_str());
+  // we have a declarations file...
+  f_decl_name_ = get_out_dir() + capitalize(program_name_) + ".swift";
+  create_file(f_decl_, capitalize(program_name_));
 
-  f_decl_ << autogen_comment() << endl;
-
-  f_decl_ << swift_imports() << swift_thrift_imports() << endl;
-
-  // ...and a .swift implementation extensions file
-  string f_impl_name = capitalize(program_name_) + "+Exts.swift";
-  string f_impl_fullname = get_out_dir() + f_impl_name;
-  f_impl_.open(f_impl_fullname.c_str());
-
-  f_impl_ << autogen_comment() << endl;
-
-  f_impl_ << swift_imports() << swift_thrift_imports() << endl;
+  // ...and a implementation extensions file
+  f_impl_name_ = get_out_dir() + capitalize(program_name_) + "+Exts.swift";
+  create_file(f_impl_, capitalize(program_name_) + "+Exts");
 
   if (telemetry_object_) {
     f_impl_ << telemetry_object_protocols() << endl << endl;
@@ -330,7 +333,7 @@ public enum TelemetryValue: Equatable {
   case bool(Bool)
   case dictionary(TelemetryDictionary)
 
-  fileprivate init(_ value: Any) {
+  init(_ value: Any) {
     if let string = value as? String {
       self = .string(string)
     }
@@ -428,70 +431,82 @@ void t_swift_generator::generate_typedef(t_typedef* ttypedef) {
  * @param tenum The enumeration
  */
 void t_swift_generator::generate_enum(t_enum* tenum) {
-  print_doc(f_decl_, tenum, false);
+  if (separate_files_) {
+    ofstream f_enum;
+    create_file(f_enum, tenum->get_name());
 
-  f_decl_ << indent() << "public enum " << tenum->get_name() << " : Int32";
-  block_open(f_decl_);
+    generate_enum(f_enum, f_enum, tenum);
+  }
+  else {
+    generate_enum(f_decl_, f_impl_, tenum);
+  }
+}
+
+void t_swift_generator::generate_enum(ofstream& f_enum_decl, ofstream& f_enum_impl, t_enum* tenum) {
+  print_doc(f_enum_decl, tenum, false);
+
+  f_enum_decl << indent() << "public enum " << tenum->get_name() << " : Int32";
+  block_open(f_enum_decl);
 
   vector<t_enum_value*> constants = tenum->get_constants();
   vector<t_enum_value*>::iterator c_iter;
 
   for (c_iter = constants.begin(); c_iter != constants.end(); ++c_iter) {
-    print_doc(f_decl_, *c_iter, true);
-    f_decl_ << indent() << "case " << enum_value_name(*c_iter)
-            << " = " << (*c_iter)->get_value() << endl;
+    print_doc(f_enum_decl, *c_iter, true);
+    f_enum_decl << indent() << "case " << enum_value_name(*c_iter)
+                << " = " << (*c_iter)->get_value() << endl;
   }
 
   if (!exclude_empty_init_) {
-    f_decl_ << endl;
-    f_decl_ << indent() << "public init() { self.init(rawValue: " << constants.front()->get_value() << ")! }" << endl;
+    f_enum_decl << endl;
+    f_enum_decl << indent() << "public init() { self.init(rawValue: " << constants.front()->get_value() << ")! }" << endl;
   }
 
-  block_close(f_decl_);
-  f_decl_ << endl;
+  block_close(f_enum_decl);
+  f_enum_decl << endl;
 
-  f_impl_ << indent() << "extension " << tenum->get_name();
+  f_enum_impl << indent() << "extension " << tenum->get_name();
   if (!exclude_thrift_types_) {
-    f_impl_ << " : TEnum";
+    f_enum_impl << " : TEnum";
   }
-  block_open(f_impl_);
+  block_open(f_enum_impl);
 
-  f_impl_ << endl;
+  f_enum_impl << endl;
 
   if (!exclude_thrift_types_) {
-    f_impl_ << indent() << "public static func readValueFromProtocol(proto: TProtocol) throws -> " << tenum->get_name();
-    block_open(f_impl_);
-    f_impl_ << indent() << "var raw = Int32()" << endl
-            << indent() << "try proto.readI32(&raw)" << endl
-            << indent() << "return " << tenum->get_name() << "(rawValue: raw)!" << endl;
-    block_close(f_impl_);
-    f_impl_ << endl;
+    f_enum_impl << indent() << "public static func readValueFromProtocol(proto: TProtocol) throws -> " << tenum->get_name();
+    block_open(f_enum_impl);
+    f_enum_impl << indent() << "var raw = Int32()" << endl
+                << indent() << "try proto.readI32(&raw)" << endl
+                << indent() << "return " << tenum->get_name() << "(rawValue: raw)!" << endl;
+    block_close(f_enum_impl);
+    f_enum_impl << endl;
 
-    f_impl_ << indent() << "public static func writeValue(value: " << tenum->get_name() << ", toProtocol proto: TProtocol) throws";
-    block_open(f_impl_);
-    f_impl_ << indent() << "try proto.writeI32(value.rawValue)" << endl;
-    block_close(f_impl_);
-    f_impl_ << endl;
+    f_enum_impl << indent() << "public static func writeValue(value: " << tenum->get_name() << ", toProtocol proto: TProtocol) throws";
+    block_open(f_enum_impl);
+    f_enum_impl << indent() << "try proto.writeI32(value.rawValue)" << endl;
+    block_close(f_enum_impl);
+    f_enum_impl << endl;
   }
 
   if (telemetry_object_) {
-    f_impl_ << indent() << "public func telemetryName() -> String";
-    block_open(f_impl_);
+    f_enum_impl << indent() << "public func telemetryName() -> String";
+    block_open(f_enum_impl);
     if (boost::algorithm::ends_with(tenum->get_name(), "AsInt")) {
-      f_impl_ << indent() << "return \"\\(rawValue)\"" << endl;
+      f_enum_impl << indent() << "return \"\\(rawValue)\"" << endl;
     }
     else {
-      f_impl_ << indent() << "switch self {" << endl;
+      f_enum_impl << indent() << "switch self {" << endl;
       for (const auto& value : tenum->get_constants()) {
-        f_impl_ << indent() << "case ." << enum_value_name(value) << ": return \"" << value->get_name() << "\"" << endl;
+        f_enum_impl << indent() << "case ." << enum_value_name(value) << ": return \"" << value->get_name() << "\"" << endl;
       }
-      f_impl_ << indent() << "}" << endl;
+      f_enum_impl << indent() << "}" << endl;
     }
-    block_close(f_impl_);
+    block_close(f_enum_impl);
   }
 
-  block_close(f_impl_);
-  f_impl_ << endl;
+  block_close(f_enum_impl);
+  f_enum_impl << endl;
 }
 
 /**
@@ -529,8 +544,20 @@ void t_swift_generator::generate_consts(vector<t_const*> consts) {
  * @param tstruct The struct definition
  */
 void t_swift_generator::generate_struct(t_struct* tstruct) {
-  generate_swift_struct(f_decl_, tstruct, false);
-  generate_swift_struct_implementation(f_impl_, tstruct, false, false);
+  if (separate_files_) {
+    ofstream f_struct;
+    create_file(f_struct, tstruct->get_name());
+
+    generate_struct(f_struct, f_struct, tstruct);
+  }
+  else {
+    generate_struct(f_decl_, f_impl_, tstruct);
+  }
+}
+
+void t_swift_generator::generate_struct(ofstream& f_struct_decl, ofstream& f_struct_impl, t_struct* tstruct) {
+  generate_swift_struct(f_struct_decl, tstruct, false);
+  generate_swift_struct_implementation(f_struct_impl, tstruct, false, false);
 }
 
 /**
@@ -539,8 +566,20 @@ void t_swift_generator::generate_struct(t_struct* tstruct) {
  * @param tstruct The struct definition
  */
 void t_swift_generator::generate_xception(t_struct* txception) {
-  generate_swift_struct(f_decl_, txception, false);
-  generate_swift_struct_implementation(f_impl_, txception, false, false);
+  if (separate_files_) {
+    ofstream f_xception;
+    create_file(f_xception, txception->get_name());
+
+    generate_xception(f_xception, f_xception, txception);
+  }
+  else {
+    generate_xception(f_decl_, f_impl_, txception);
+  }
+}
+
+void t_swift_generator::generate_xception(ofstream& f_xception_decl, ofstream& f_xception_impl, t_struct* txception) {
+  generate_swift_struct(f_xception_decl, txception, false);
+  generate_swift_struct_implementation(f_xception_impl, txception, false, false);
 }
 
 /**
@@ -1221,7 +1260,18 @@ void t_swift_generator::generate_swift_struct_printable_extension(ofstream& out,
  * @param tservice The service definition
  */
 void t_swift_generator::generate_service(t_service* tservice) {
+  if (separate_files_) {
+    ofstream f_service;
+    create_file(f_service, tservice->get_name());
 
+    generate_service(f_service, tservice);
+  }
+  else {
+    generate_service(f_impl_, tservice);
+  }
+}
+
+void t_swift_generator::generate_service(ofstream& f_service_impl, t_service* tservice) {
   generate_swift_service_protocol(f_decl_, tservice);
   generate_swift_service_client(f_decl_, tservice);
   if (async_clients_) {
@@ -1230,13 +1280,13 @@ void t_swift_generator::generate_service(t_service* tservice) {
   }
   generate_swift_service_server(f_decl_, tservice);
 
-  generate_swift_service_helpers(tservice);
+  generate_swift_service_helpers(f_service_impl, tservice);
 
-  generate_swift_service_client_implementation(f_impl_, tservice);
+  generate_swift_service_client_implementation(f_service_impl, tservice);
   if (async_clients_) {
-    generate_swift_service_client_async_implementation(f_impl_, tservice);
+    generate_swift_service_client_async_implementation(f_service_impl, tservice);
   }
-  generate_swift_service_server_implementation(f_impl_, tservice);
+  generate_swift_service_server_implementation(f_service_impl, tservice);
 }
 
 /**
@@ -1244,7 +1294,7 @@ void t_swift_generator::generate_service(t_service* tservice) {
  *
  * @param tservice The service
  */
-void t_swift_generator::generate_swift_service_helpers(t_service* tservice) {
+void t_swift_generator::generate_swift_service_helpers(ofstream& f_service_impl, t_service* tservice) {
   vector<t_function*> functions = tservice->get_functions();
   vector<t_function*>::iterator f_iter;
   for (f_iter = functions.begin(); f_iter != functions.end(); ++f_iter) {
@@ -1261,9 +1311,9 @@ void t_swift_generator::generate_swift_service_helpers(t_service* tservice) {
       qname_ts.append(*m_iter);
     }
 
-    generate_swift_struct(f_impl_, &qname_ts, true);
-    generate_swift_struct_implementation(f_impl_, &qname_ts, false, true);
-    generate_function_helpers(tservice, *f_iter);
+    generate_swift_struct(f_service_impl, &qname_ts, true);
+    generate_swift_struct_implementation(f_service_impl, &qname_ts, false, true);
+    generate_function_helpers(f_service_impl, tservice, *f_iter);
   }
 }
 
@@ -1284,7 +1334,7 @@ string t_swift_generator::function_args_helper_struct_type(t_service *tservice, 
  *
  * @param tfunction The function
  */
-void t_swift_generator::generate_function_helpers(t_service *tservice, t_function* tfunction) {
+void t_swift_generator::generate_function_helpers(ofstream& f_service_impl, t_service *tservice, t_function* tfunction) {
   if (tfunction->is_oneway()) {
     return;
   }
@@ -1309,8 +1359,8 @@ void t_swift_generator::generate_function_helpers(t_service *tservice, t_functio
   }
 
   // generate the result struct
-  generate_swift_struct(f_impl_, &result, true);
-  generate_swift_struct_implementation(f_impl_, &result, true, true);
+  generate_swift_struct(f_service_impl, &result, true);
+  generate_swift_struct_implementation(f_service_impl, &result, true, true);
 
   for (f_iter = result.get_members().begin(); f_iter != result.get_members().end(); ++f_iter) {
     delete *f_iter;
@@ -2586,6 +2636,18 @@ string t_swift_generator::type_to_enum(t_type* type, bool qualified) {
   throw "INVALID TYPE IN type_to_enum: " + type->get_name();
 }
 
+/**
+ * Creates a file in the output directory with the given name.
+ */
+void t_swift_generator::create_file(ofstream& out, string file_name) {
+  string file_stream_fullname = get_out_dir() + file_name + ".swift";
+  out.open(file_stream_fullname.c_str());
+
+  out << autogen_comment() << endl;
+
+  out << swift_imports() << swift_thrift_imports() << endl;
+}
+
 
 THRIFT_REGISTER_GENERATOR(
     swift,
@@ -2604,4 +2666,5 @@ THRIFT_REGISTER_GENERATOR(
     "    exclude_equatable:\n"
     "                     Do not generate Equatable and Hashable implementations\n"
     "    exclude_printable:\n"
-    "                     Do not generate CustomStringConvertible implementation\n")
+    "                     Do not generate CustomStringConvertible implementation\n"
+    "    separate_files:  Create a separate file for each type\n")
