@@ -2,11 +2,13 @@
   "rules": [
     {
       "name": "enum_name",
-      "regex": "^OT\\w*"
+      "message": "Enum names should start with OT and after should be PascalCase",
+      "regex": "^OT[A-Za-z][A-Za-z0-9]+$"
     },
     {
       "name": "enum_constant_name",
-      "regex": "^[a-z0-9_]+$",
+      "message": "Enum constant names should be in snake case",
+      "regex": "^[a-z][a-z0-9_]*[a-z]$",
       "enum_exceptions": [
         "OTPrivacyLevel",
         "OTDiagnosticConsentLevelAsInt",
@@ -119,11 +121,13 @@
     },
     {
       "name": "struct_name",
-      "regex": "^OT\\w*"
+      "message": "Struct names should start with OT and after should be PascalCase",
+      "regex": "^OT[A-Za-z][A-Za-z0-9]+$"
     },
     {
       "name": "struct_member_name",
-      "regex": "^[a-z0-9_]+$",
+      "message": "Struct member names should be in snake case",
+      "regex": "^[a-z][a-z0-9_]*[a-z]$",
       "struct_exceptions": [
         "OTPrivacyTags",
         "OTPrivacyConsentNonAADProperties",
@@ -166,7 +170,8 @@
     },
     {
       "name": "struct_member_value",
-      "regex": "^[a-z0-9_]+$",
+      "message": "Struct member values should be in snake case",
+      "regex": "^[a-z][a-z0-9_]*[a-z]$",
       "exceptions": [
         "watchAppV2",
         "OEM_INSTALL"
@@ -174,6 +179,7 @@
     },
     {
       "name": "override_struct_member",
+      "message": "Sub-struct members should not override each other",
       "member_name_by_struct_exceptions": [
         {
           "OTReadConversation": "orientation"
@@ -181,13 +187,15 @@
       ]
     },
     {
-      "name": "struct_member_order"
+      "name": "struct_member_order",
+      "message": "Struct member keys should be in order starting at 1"
     },
     {
       "name": "required_before_optional",
+      "message": "Struct required members should be before optional",
       "struct_exceptions": [
         "OTPropertiesGeneral",
-	"OTSessionEvent"
+	      "OTSessionEvent"
       ]
     }
   ]

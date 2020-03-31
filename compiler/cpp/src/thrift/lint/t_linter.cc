@@ -35,6 +35,7 @@ bool t_linter::lint() {
   for (auto& rule : lint_file_root.get_child("rules")) {
     string lint_name = rule.second.get<string>("name");
     auto regex = rule.second.get_optional<string>("regex");
+    string message = rule.second.get<string>("message");
 
     set<string> enum_exceptions = as_set<string>(rule.second, "enum_exceptions");
     set<string> struct_exceptions = as_set<string>(rule.second, "struct_exceptions");
@@ -47,7 +48,7 @@ bool t_linter::lint() {
         failure("Should have provided regex for enum_name");
       }
 
-      if (!validate_enum_names(*regex, enum_exceptions)) {
+      if (!validate_enum_names(message, *regex, enum_exceptions)) {
         contains_failure = true;
       }
     } else if (lint_name == "enum_constant_name") {
@@ -55,7 +56,7 @@ bool t_linter::lint() {
         failure("Should have provided regex for enum_constant_name");
       }
 
-      if (!validate_enum_constant_names(*regex, enum_exceptions, exceptions)) {
+      if (!validate_enum_constant_names(message, *regex, enum_exceptions, exceptions)) {
         contains_failure = true;
       }
     } else if (lint_name == "struct_name") {
@@ -63,7 +64,7 @@ bool t_linter::lint() {
         failure("Should have provided regex for struct_name");
       }
 
-      if (!validate_struct_names(*regex, struct_exceptions)) {
+      if (!validate_struct_names(message, *regex, struct_exceptions)) {
         contains_failure = true;
       }
     } else if (lint_name == "struct_member_name") {
@@ -71,7 +72,7 @@ bool t_linter::lint() {
         failure("Should have provided regex for struct_member_name");
       }
 
-      if (!validate_struct_member_names(*regex, struct_exceptions, exceptions)) {
+      if (!validate_struct_member_names(message, *regex, struct_exceptions, exceptions)) {
         contains_failure = true;
       }
     } else if (lint_name == "struct_member_value") {
@@ -79,19 +80,19 @@ bool t_linter::lint() {
         failure("Should have provided regex for struct_member_value");
       }
 
-      if (!validate_struct_member_values(*regex, struct_exceptions, exceptions)) {
+      if (!validate_struct_member_values(message, *regex, struct_exceptions, exceptions)) {
         contains_failure = true;
       }
     } else if (lint_name == "override_struct_member") {
-      if (!validate_override_struct_member_names(member_name_by_struct_exceptions)) {
+      if (!validate_override_struct_member_names(message, member_name_by_struct_exceptions)) {
         contains_failure = true;
       }
     } else if (lint_name == "struct_member_order") {
-      if (!validate_struct_member_order(struct_exceptions)) {
+      if (!validate_struct_member_order(message, struct_exceptions)) {
         contains_failure = true;
       }
     } else if (lint_name == "required_before_optional") {
-      if (!validate_required_before_optional(struct_exceptions)) {
+      if (!validate_required_before_optional(message, struct_exceptions)) {
         contains_failure = true;
       }
     }
@@ -103,7 +104,7 @@ bool t_linter::lint() {
   return !contains_failure;
 }
 
-bool t_linter::validate_enum_names(string raw_regex, set<string> enum_exceptions) {
+bool t_linter::validate_enum_names(string message, string raw_regex, set<string> enum_exceptions) {
   std::regex regex(raw_regex);
   bool contains_failure = false;
 
@@ -117,7 +118,7 @@ bool t_linter::validate_enum_names(string raw_regex, set<string> enum_exceptions
     }
 
     if (!std::regex_match(en->get_name(), regex)) {
-      cerr << "Failed regex for enum name: " << en->get_name() << endl;
+      cerr << message << ", enum name: " << en->get_name() << endl;
       contains_failure = true;
     }
   }
@@ -125,7 +126,7 @@ bool t_linter::validate_enum_names(string raw_regex, set<string> enum_exceptions
   return !contains_failure;
 }
 
-bool t_linter::validate_struct_names(string raw_regex, set<string> struct_exceptions) {
+bool t_linter::validate_struct_names(string message, string raw_regex, set<string> struct_exceptions) {
   std::regex regex(raw_regex);
   bool contains_failure = false;
 
@@ -139,7 +140,7 @@ bool t_linter::validate_struct_names(string raw_regex, set<string> struct_except
     }
 
     if (!std::regex_match(tstruct->get_name(), regex)) {
-      cerr << "Failed regex for struct name: " << tstruct->get_name() << endl;
+      cerr << message << ", struct name: " << tstruct->get_name() << endl;
       contains_failure = true;
     }
   }
@@ -147,7 +148,7 @@ bool t_linter::validate_struct_names(string raw_regex, set<string> struct_except
   return !contains_failure;
 }
 
-bool t_linter::validate_enum_constant_names(string raw_regex, set<string> enum_exceptions, set<string> exceptions) {
+bool t_linter::validate_enum_constant_names(string message, string raw_regex, set<string> enum_exceptions, set<string> exceptions) {
   std::regex regex(raw_regex);
   bool contains_failure = false;
 
@@ -171,7 +172,7 @@ bool t_linter::validate_enum_constant_names(string raw_regex, set<string> enum_e
       }
 
       if (!std::regex_match(name, regex)) {
-        cerr << "Failed regex for enum constant name: " << name << endl;
+        cerr << message << ", enum constant name: " << name << endl;
         contains_failure = true;
       }
     }
@@ -180,7 +181,7 @@ bool t_linter::validate_enum_constant_names(string raw_regex, set<string> enum_e
   return !contains_failure;
 }
 
-bool t_linter::validate_struct_member_names(string raw_regex, set<string> struct_exceptions, set<string> exceptions) {
+bool t_linter::validate_struct_member_names(string message, string raw_regex, set<string> struct_exceptions, set<string> exceptions) {
   std::regex regex(raw_regex);
   bool contains_failure = false;
 
@@ -204,7 +205,7 @@ bool t_linter::validate_struct_member_names(string raw_regex, set<string> struct
       }
 
       if (!std::regex_match(name, regex)) {
-        cerr << "Failed regex for struct member name: " << name << endl;
+        cerr << message << ", struct member name: " << name << endl;
         contains_failure = true;
       }
     }
@@ -213,7 +214,7 @@ bool t_linter::validate_struct_member_names(string raw_regex, set<string> struct
   return !contains_failure;
 }
 
-bool t_linter::validate_struct_member_values(string raw_regex, set<string> struct_exceptions, set<string> exceptions) {
+bool t_linter::validate_struct_member_values(string message, string raw_regex, set<string> struct_exceptions, set<string> exceptions) {
   std::regex regex(raw_regex);
   bool contains_failure = false;
 
@@ -250,7 +251,7 @@ bool t_linter::validate_struct_member_values(string raw_regex, set<string> struc
           }
 
           if (!std::regex_match(value, regex)) {
-            cerr << "Failed regex for struct member value: " << value << endl;
+            cerr << message << ", struct member value: " << value << endl;
             contains_failure = true;
           }
           break;
@@ -264,13 +265,13 @@ bool t_linter::validate_struct_member_values(string raw_regex, set<string> struc
   return !contains_failure;
 }
 
-bool t_linter::validate_override_struct_member_names(vector<map<string, string>> member_name_by_struct_exceptions) {
+bool t_linter::validate_override_struct_member_names(string message, vector<map<string, string>> member_name_by_struct_exceptions) {
   bool contains_failure = false;
 
   const vector<t_struct*>& structs = program_->get_structs();
   vector<t_struct*>::const_iterator s_iter;
   for (s_iter = structs.begin(); s_iter != structs.end(); ++s_iter) {
-    if (!validate_override_struct_member_names(*s_iter, member_name_by_struct_exceptions, map<string, string>())) {
+    if (!validate_override_struct_member_names(message, *s_iter, member_name_by_struct_exceptions, map<string, string>())) {
       contains_failure = true;
     }
   }
@@ -279,6 +280,7 @@ bool t_linter::validate_override_struct_member_names(vector<map<string, string>>
 }
 
 bool t_linter::validate_override_struct_member_names(
+  string message,
   t_struct* tstruct,
   vector<map<string, string>> member_name_by_struct_exceptions,
   map<string, string> member_name_by_struct) {
@@ -298,7 +300,8 @@ bool t_linter::validate_override_struct_member_names(
 
     std::map<string, string>::iterator existing_member_name_struct = member_name_by_struct.find(name);
     if (existing_member_name_struct != member_name_by_struct.end()) {
-      cerr << "Multiple instances member value: " << name;
+      cerr << message;
+      cerr << ", member value: " << name;
       cerr << ", struct: " << tstruct->get_name();
       cerr << ", struct: " << existing_member_name_struct->second << endl;
       contains_failure = true;
@@ -316,7 +319,7 @@ bool t_linter::validate_override_struct_member_names(
 
     t_struct* sub_struct = (t_struct*)field->get_type();
 
-    if (!validate_override_struct_member_names(sub_struct, member_name_by_struct_exceptions, member_name_by_struct)) {
+    if (!validate_override_struct_member_names(message, sub_struct, member_name_by_struct_exceptions, member_name_by_struct)) {
       contains_failure = true;
     }
   }
@@ -324,7 +327,7 @@ bool t_linter::validate_override_struct_member_names(
   return !contains_failure;
 }
 
-bool t_linter::validate_struct_member_order(set<string> struct_exceptions) {
+bool t_linter::validate_struct_member_order(string message, set<string> struct_exceptions) {
   bool contains_failure = false;
 
   const vector<t_struct*>& structs = program_->get_structs();
@@ -344,9 +347,10 @@ bool t_linter::validate_struct_member_order(set<string> struct_exceptions) {
       t_field* tfield = *f_iter;
 
       if (tfield->get_key() != cur_index) {
-        cerr << "Unexpected key: " << tfield->get_key();
-        cerr << " for struct: " << tstruct->get_name();
-        cerr << " member: " << tfield->get_name() << endl;
+        cerr << message;
+        cerr << ", key: " << tfield->get_key();
+        cerr << ", struct: " << tstruct->get_name();
+        cerr << ", member: " << tfield->get_name() << endl;
         contains_failure = true;
       }
 
@@ -357,7 +361,7 @@ bool t_linter::validate_struct_member_order(set<string> struct_exceptions) {
   return !contains_failure;
 }
 
-bool t_linter::validate_required_before_optional(set<string> struct_exceptions) {
+bool t_linter::validate_required_before_optional(string message, set<string> struct_exceptions) {
   bool contains_failure = false;
 
   const vector<t_struct*>& structs = program_->get_structs();
@@ -381,7 +385,8 @@ bool t_linter::validate_required_before_optional(set<string> struct_exceptions) 
       }
       else {
         if (has_optional) {
-          cerr << "Required member after optional: " << tfield->get_name();
+          cerr << message;
+          cerr << ", member: " << tfield->get_name();
           cerr << ", struct: " << tstruct->get_name() << endl;
           contains_failure = true;
         }

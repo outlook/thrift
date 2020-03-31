@@ -53,21 +53,22 @@ private:
 
   string lint_file_;
 
-  bool validate_enum_names(string raw_regex, set<string> enum_exceptions);
-  bool validate_struct_names(string raw_regex, set<string> struct_exceptions);
-  bool validate_enum_constant_names(string raw_regex, set<string> enum_exceptions, set<string> exceptions);
-  bool validate_struct_member_names(string raw_regex, set<string> struct_exceptions, set<string> exceptions);
-  bool validate_struct_member_values(string raw_regex, set<string> struct_exceptions, set<string> exceptions);
+  bool validate_enum_names(string message, string raw_regex, set<string> enum_exceptions);
+  bool validate_struct_names(string message, string raw_regex, set<string> struct_exceptions);
+  bool validate_enum_constant_names(string message, string raw_regex, set<string> enum_exceptions, set<string> exceptions);
+  bool validate_struct_member_names(string message, string raw_regex, set<string> struct_exceptions, set<string> exceptions);
+  bool validate_struct_member_values(string message, string raw_regex, set<string> struct_exceptions, set<string> exceptions);
 
-  bool validate_override_struct_member_names(vector<map<string, string>> member_name_by_struct_exceptions);
+  bool validate_override_struct_member_names(string message, vector<map<string, string>> member_name_by_struct_exceptions);
   bool validate_override_struct_member_names(
+    string message,
     t_struct* tstruct,
     vector<map<string, string>> member_name_by_struct_exceptions,
     map<string, string> member_name_by_struct);
 
-  bool validate_struct_member_order(set<string> struct_exceptions);
+  bool validate_struct_member_order(string message, set<string> struct_exceptions);
 
-  bool validate_required_before_optional(set<string> struct_exceptions);
+  bool validate_required_before_optional(string message, set<string> struct_exceptions);
 
   template<typename T>
   set<T> as_set(pt::ptree pt, string key);
