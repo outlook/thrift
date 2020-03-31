@@ -184,7 +184,11 @@
       "name": "struct_member_order"
     },
     {
-      "name": "required_before_optional"
+      "name": "required_before_optional",
+      "struct_exceptions": [
+        "OTPropertiesGeneral",
+	"OTSessionEvent"
+      ]
     }
   ]
 }
