@@ -40,6 +40,8 @@ bool t_linter::lint() {
     set<string> struct_exceptions = as_set<string>(rule.second, "struct_exceptions");
     set<string> exceptions = as_set<string>(rule.second, "exceptions");
 
+    vector<map<string, string>> member_name_by_struct_exceptions = as_map_array<string>(rule.second, "member_name_by_struct_exceptions");
+
     if (lint_name == "enum_name") {
       if (!regex) {
         failure("Should have provided regex for enum_name");
@@ -81,7 +83,11 @@ bool t_linter::lint() {
         contains_failure = true;
       }
     } else if (lint_name == "override_struct_member") {
-      if (!validate_override_struct_member_names()) {
+      if (!validate_override_struct_member_names(member_name_by_struct_exceptions)) {
+        contains_failure = true;
+      }
+    } else if (lint_name == "struct_member_order") {
+      if (!validate_struct_member_order()) {
         contains_failure = true;
       }
     }
@@ -254,17 +260,13 @@ bool t_linter::validate_struct_member_values(string raw_regex, set<string> struc
   return !contains_failure;
 }
 
-bool t_linter::validate_override_struct_member_names() {
-  map<string, string> struct_member_exceptions = {
-    {"OTReadConversation", "orientation"},
-  };
-
+bool t_linter::validate_override_struct_member_names(vector<map<string, string>> member_name_by_struct_exceptions) {
   bool contains_failure = false;
 
   const vector<t_struct*>& structs = program_->get_structs();
   vector<t_struct*>::const_iterator s_iter;
   for (s_iter = structs.begin(); s_iter != structs.end(); ++s_iter) {
-    if (!validate_override_struct_member_names(*s_iter, struct_member_exceptions, map<string, string>())) {
+    if (!validate_override_struct_member_names(*s_iter, member_name_by_struct_exceptions, map<string, string>())) {
       contains_failure = true;
     }
   }
@@ -274,7 +276,7 @@ bool t_linter::validate_override_struct_member_names() {
 
 bool t_linter::validate_override_struct_member_names(
   t_struct* tstruct,
-  map<string, string> member_name_by_struct_exceptions,
+  vector<map<string, string>> member_name_by_struct_exceptions,
   map<string, string> member_name_by_struct) {
 
   bool contains_failure = false;
@@ -284,9 +286,7 @@ bool t_linter::validate_override_struct_member_names(
   for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
     t_field* field = *f_iter;
 
-    tuple<string, string> struct_member_tuple = tuple<string, string>(tstruct->get_name(), field->get_name());
-
-    if (member_name_by_struct_exceptions.find(tstruct->get_name()) != member_name_by_struct_exceptions.end()) {
+    if (contains_value(member_name_by_struct_exceptions, tstruct->get_name())) {
       continue;
     }
 
@@ -320,6 +320,10 @@ bool t_linter::validate_override_struct_member_names(
   return !contains_failure;
 }
 
+bool t_linter::validate_struct_member_order() {
+  return true;
+}
+
 template<typename T>
 set<T> t_linter::as_set(pt::ptree pt, string key) {
   set<T> s;
@@ -333,4 +337,33 @@ set<T> t_linter::as_set(pt::ptree pt, string key) {
     s.insert(item.second.get_value<T>());
   }
   return s;
+}
+
+template<typename T>
+vector<map<string, T>> t_linter::as_map_array(pt::ptree pt, string key) {
+  vector<map<string, T>> v;
+
+  auto value = pt.get_child_optional(key);
+  if (!value) {
+    return v;
+  }
+
+  for (auto& item : *value) {
+    map<string, T> m;
+    for (auto& child_item : item.second) {
+      m[child_item.first] = child_item.second.get_value<T>();
+    }
+
+    v.push_back(m);
+  }
+  return v;
+}
+
+bool t_linter::contains_value(vector<map<string, string>> map_array, string key) {
+  for (map<string, string> map : map_array) {
+    if (map.find(key) != map.end()) {
+      return true;
+    }
+  }
+  return false;
 }

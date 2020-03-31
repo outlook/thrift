@@ -173,7 +173,15 @@
       ]
     },
     {
-      "name": "override_struct_member"
+      "name": "override_struct_member",
+      "member_name_by_struct_exceptions": [
+        {
+          "OTReadConversation": "orientation"
+        }
+      ]
+    },
+    {
+      "name": "struct_member_order"
     }
   ]
 }

@@ -59,12 +59,19 @@ private:
   bool validate_struct_member_names(string raw_regex, set<string> struct_exceptions, set<string> exceptions);
   bool validate_struct_member_values(string raw_regex, set<string> struct_exceptions, set<string> exceptions);
 
-  bool validate_override_struct_member_names();
+  bool validate_override_struct_member_names(vector<map<string, string>> member_name_by_struct_exceptions);
   bool validate_override_struct_member_names(
     t_struct* tstruct,
-    map<string, string> member_name_by_struct_exceptions,
+    vector<map<string, string>> member_name_by_struct_exceptions,
     map<string, string> member_name_by_struct);
+
+  bool validate_struct_member_order();
 
   template<typename T>
   set<T> as_set(pt::ptree pt, string key);
+
+  template<typename T>
+  vector<map<string, T>> as_map_array(pt::ptree pt, string key);
+
+  bool contains_value(vector<map<string, string>> map_array, string key);
 };
