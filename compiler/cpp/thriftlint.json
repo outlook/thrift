@@ -183,6 +183,9 @@
       "member_name_by_struct_exceptions": [
         {
           "OTReadConversation": "orientation"
+        },
+        {
+          "OTComponentFamilyDuration": "orientation"
         }
       ]
     },
