@@ -271,7 +271,7 @@ bool t_linter::validate_override_struct_member_names(string message, vector<map<
   const vector<t_struct*>& structs = program_->get_structs();
   vector<t_struct*>::const_iterator s_iter;
   for (s_iter = structs.begin(); s_iter != structs.end(); ++s_iter) {
-    if (!validate_override_struct_member_names(message, *s_iter, member_name_by_struct_exceptions, map<string, string>())) {
+    if (!validate_override_struct_member_names(message, *s_iter, member_name_by_struct_exceptions)) {
       contains_failure = true;
     }
   }
@@ -282,8 +282,17 @@ bool t_linter::validate_override_struct_member_names(string message, vector<map<
 bool t_linter::validate_override_struct_member_names(
   string message,
   t_struct* tstruct,
+  vector<map<string, string>> member_name_by_struct_exceptions) {
+
+  map<string, string> member_name_by_struct;
+  return validate_override_struct_member_names(message, tstruct, member_name_by_struct_exceptions, member_name_by_struct);
+}
+
+bool t_linter::validate_override_struct_member_names(
+  string message,
+  t_struct* tstruct,
   vector<map<string, string>> member_name_by_struct_exceptions,
-  map<string, string> member_name_by_struct) {
+  map<string, string> &member_name_by_struct) {
 
   bool contains_failure = false;
 

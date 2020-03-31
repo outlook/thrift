@@ -63,8 +63,12 @@ private:
   bool validate_override_struct_member_names(
     string message,
     t_struct* tstruct,
+    vector<map<string, string>> member_name_by_struct_exceptions);
+  bool validate_override_struct_member_names(
+    string message,
+    t_struct* tstruct,
     vector<map<string, string>> member_name_by_struct_exceptions,
-    map<string, string> member_name_by_struct);
+    map<string, string> &member_name_by_struct);
 
   bool validate_struct_member_order(string message, set<string> struct_exceptions);
 
