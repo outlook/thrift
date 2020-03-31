@@ -87,7 +87,7 @@ bool t_linter::lint() {
         contains_failure = true;
       }
     } else if (lint_name == "struct_member_order") {
-      if (!validate_struct_member_order()) {
+      if (!validate_struct_member_order(struct_exceptions)) {
         contains_failure = true;
       }
     }
@@ -320,8 +320,37 @@ bool t_linter::validate_override_struct_member_names(
   return !contains_failure;
 }
 
-bool t_linter::validate_struct_member_order() {
-  return true;
+bool t_linter::validate_struct_member_order(set<string> struct_exceptions) {
+  bool contains_failure = false;
+
+  const vector<t_struct*>& structs = program_->get_structs();
+  vector<t_struct*>::const_iterator s_iter;
+  for (s_iter = structs.begin(); s_iter != structs.end(); ++s_iter) {
+    t_struct* tstruct = *s_iter;
+
+    if (struct_exceptions.find(tstruct->get_name()) != struct_exceptions.end()) {
+      continue;
+    }
+
+    int cur_index = 1;
+
+    const vector<t_field*>& fields = tstruct->get_members();
+    vector<t_field*>::const_iterator f_iter;
+    for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
+      t_field* tfield = *f_iter;
+
+      if (tfield->get_key() != cur_index) {
+        cerr << "Unexpected key: " << tfield->get_key();
+        cerr << " for struct: " << tstruct->get_name();
+        cerr << " member: " << tfield->get_name() << endl;
+        contains_failure = true;
+      }
+
+      ++cur_index;
+    }
+  }
+
+  return !contains_failure;
 }
 
 template<typename T>

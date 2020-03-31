@@ -65,7 +65,7 @@ private:
     vector<map<string, string>> member_name_by_struct_exceptions,
     map<string, string> member_name_by_struct);
 
-  bool validate_struct_member_order();
+  bool validate_struct_member_order(set<string> struct_exceptions);
 
   template<typename T>
   set<T> as_set(pt::ptree pt, string key);
