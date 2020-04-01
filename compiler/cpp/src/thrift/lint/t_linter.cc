@@ -97,7 +97,7 @@ bool t_linter::lint() {
       }
     }
     else {
-      failure("Unknown lint name: ", lint_name);
+      failure("Unknown lint name: ", lint_name.c_str());
     }
   }
 
