@@ -20,6 +20,7 @@
 #include <iostream>
 #include "thrift/parse/t_base_type.h"
 #include "thrift/lint/t_linter.h"
+#include <boost/algorithm/string/predicate.hpp>
 
 /**
  * Framework linter method
@@ -93,6 +94,10 @@ bool t_linter::lint() {
       }
     } else if (lint_name == "required_before_optional") {
       if (!validate_required_before_optional(message, struct_exceptions)) {
+        contains_failure = true;
+      }
+    } else if (lint_name == "implicit_enum_value") {
+      if (!validate_enum_implicit_value(message, enum_exceptions)) {
         contains_failure = true;
       }
     }
@@ -427,6 +432,41 @@ bool t_linter::validate_required_before_optional(string message, set<string> str
           cerr << ", struct: " << tstruct->get_name() << endl;
           contains_failure = true;
         }
+      }
+    }
+  }
+
+  return !contains_failure;
+}
+
+bool t_linter::validate_enum_implicit_value(string message, set<string> enum_exceptions) {
+  bool contains_failure = false;
+
+  const vector<t_enum*>& enums = program_->get_enums();
+  vector<t_enum*>::const_iterator e_iter;
+  for (e_iter = enums.begin(); e_iter != enums.end(); ++e_iter) {
+    t_enum* en = *e_iter;
+
+    if (boost::algorithm::ends_with(en->get_name(), "AsInt")) {
+      continue;
+    }
+
+    if (enum_exceptions.find(en->get_name()) != enum_exceptions.end()) {
+      continue;
+    }
+
+    vector<t_enum_value*> constants = en->get_constants();
+    vector<t_enum_value*>::iterator c_iter;
+
+    for (c_iter = constants.begin(); c_iter != constants.end(); ++c_iter) {
+
+      t_enum_value* enum_value = *c_iter;
+
+      if (enum_value->is_explicit_value()) {
+        cerr << message;
+        cerr << ", enum: " << en->get_name();
+        cerr << ", case: " << enum_value->get_name() << endl;
+        contains_failure = true;
       }
     }
   }

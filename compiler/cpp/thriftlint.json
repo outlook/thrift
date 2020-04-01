@@ -200,6 +200,10 @@
         "OTPropertiesGeneral",
         "OTSessionEvent"
       ]
+    },
+    {
+      "name": "implicit_enum_value",
+      "message": "Enum int values should be implicit"
     }
   ]
 }
