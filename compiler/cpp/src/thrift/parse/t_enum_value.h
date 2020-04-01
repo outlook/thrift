@@ -45,12 +45,17 @@ public:
 
   bool is_explicit_value() const { return explicit_value_; }
 
+  const std::string& get_delimiter() const { return delimiter_; }
+
+  void set_delimiter(std::string delimiter) { delimiter_ = delimiter; }
+
   std::map<std::string, std::string> annotations_;
 
 private:
   std::string name_;
   int value_;
   bool explicit_value_;
+  std::string delimiter_;
 };
 
 #endif

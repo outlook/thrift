@@ -496,9 +496,12 @@ EnumDef:
       if ($1 != NULL) {
         $$->set_doc($1);
       }
-	  if ($3 != NULL) {
+	    if ($3 != NULL) {
         $$->annotations_ = $3->annotations_;
         delete $3;
+      }
+      if ($4 != NULL) {
+        $$->set_delimiter($4);
       }
     }
 
