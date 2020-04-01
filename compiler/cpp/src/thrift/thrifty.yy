@@ -515,7 +515,7 @@ EnumValue:
         failure("64-bit value supplied for enum %s will be truncated.", $1);
       }
       y_enum_val = static_cast<int32_t>($3);
-      $$ = new t_enum_value($1, y_enum_val);
+      $$ = new t_enum_value($1, y_enum_val, true);
     }
  |
   tok_identifier
@@ -526,7 +526,7 @@ EnumValue:
         failure("enum value overflow at enum %s", $1);
       }
       ++y_enum_val;
-      $$ = new t_enum_value($1, y_enum_val);
+      $$ = new t_enum_value($1, y_enum_val, false);
     }
 
 Senum:

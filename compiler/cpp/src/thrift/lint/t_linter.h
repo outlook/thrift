@@ -74,6 +74,8 @@ private:
 
   bool validate_required_before_optional(string message, set<string> struct_exceptions);
 
+  bool validate_enum_implicit_value(string message, set<string> enum_exceptions);
+
   template<typename T>
   set<T> as_set(pt::ptree pt, string key);
 

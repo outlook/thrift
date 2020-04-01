@@ -32,7 +32,10 @@
  */
 class t_enum_value : public t_doc {
 public:
-  t_enum_value(std::string name, int value) : name_(name), value_(value) {}
+  t_enum_value(std::string name, int value, bool explicit_value)
+    : name_(name),
+      value_(value),
+      explicit_value_(explicit_value) {}
 
   ~t_enum_value() {}
 
@@ -40,11 +43,14 @@ public:
 
   int get_value() const { return value_; }
 
+  bool is_explicit_value() const { return explicit_value_; }
+
   std::map<std::string, std::string> annotations_;
 
 private:
   std::string name_;
   int value_;
+  bool explicit_value_;
 };
 
 #endif
