@@ -47,6 +47,7 @@ thrift_thrift_bootstrap_SOURCES = \
                  thrift/audit/t_audit.h \
                  thrift/audit/t_audit.cpp \
                  thrift/generate/t_generator.cc \
+                 thrift/lint/t_linter.cc \
                  thrift/generate/t_generator_registry.h \
                  thrift/globals.h \
                  thrift/platform.h \
@@ -83,6 +84,7 @@ thrift_thrift_bootstrap_SOURCES = \
                  thrift/generate/t_generator.h \
                  thrift/generate/t_oop_generator.h \
                  thrift/generate/t_html_generator.h \
+                 thrift/lint/t_linter.h \
                  thrift/windows/config.h \
                  thrift/version.h \
                  thrift/generate/t_cpp_generator.cc \

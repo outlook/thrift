@@ -53,6 +53,7 @@
 #include "thrift/parse/t_scope.h"
 #include "thrift/generate/t_generator.h"
 #include "thrift/audit/t_audit.h"
+#include "thrift/lint/t_linter.h"
 #ifdef THRIFT_ENABLE_PLUGIN
 #include "thrift/plugin/plugin_output.h"
 #endif
@@ -155,6 +156,11 @@ bool gen_recurse = false;
  * Flags to control thrift audit
  */
 bool g_audit = false;
+
+/**
+ * Flags to control thrift lint
+ */
+bool g_lint = false;
 
 /**
  * Flag to control return status
@@ -698,6 +704,8 @@ void help() {
   fprintf(stderr, "                STR has the form language[:key1=val1[,key2[,key3=val3]]].\n");
   fprintf(stderr, "                Keys and values are options passed to the generator.\n");
   fprintf(stderr, "                Many options will not require values.\n");
+  fprintf(stderr, "  --lint LintFile  Lint the given thrift file.\n");
+  fprintf(stderr, "                LintFile is the file with the rules.\n");
   fprintf(stderr, "\n");
   fprintf(stderr, "Options related to audit operation\n");
   fprintf(stderr, "   --audit OldFile   Old Thrift file to be audited with 'file'\n");
@@ -1090,6 +1098,8 @@ int main(int argc, char** argv) {
   string new_thrift_include_path;
   string old_input_file;
 
+  string lint_file;
+
   // Set the current path to a dummy value to make warning messages clearer.
   g_curpath = "arguments";
 
@@ -1188,6 +1198,14 @@ int main(int argc, char** argv) {
           usage();
         }
         new_thrift_include_path = string(arg);
+      } else if (strcmp(arg, "-lint") == 0) {
+        g_lint = true;
+        arg = argv[++i];
+        if (arg == NULL) {
+          fprintf(stderr, "Missing LintFile file\n");
+          usage();
+        }
+        lint_file = string(arg);
       } else {
         fprintf(stderr, "Unrecognized option: %s\n", arg);
         usage();
@@ -1240,7 +1258,7 @@ int main(int argc, char** argv) {
     // Generate options
 
     // You gotta generate something!
-    if (generator_strings.empty()) {
+    if (generator_strings.empty() && !g_lint) {
       fprintf(stderr, "No output language(s) specified\n");
       usage();
     }
@@ -1285,8 +1303,25 @@ int main(int argc, char** argv) {
     // That is what shows up during argument parsing.
     yylineno = 1;
 
-    // Generate it!
-    generate(program, generator_strings);
+    if (g_lint) {
+      // Lint it!
+      char lf[THRIFT_PATH_MAX];
+      if (saferealpath(lint_file.c_str(), lf) == NULL) {
+        failure("Could not open LintFile with realpath: %s", lint_file.c_str());
+      }
+      string realpath_lint_file(lf);
+
+      t_linter* linter = new t_linter(program, realpath_lint_file);
+      bool success = linter->lint();
+
+      if (!success) {
+        failure("Linting failed");
+      }
+    }
+    else {
+      // Generate it!
+      generate(program, generator_strings);
+    }
     delete program;
   }
 
