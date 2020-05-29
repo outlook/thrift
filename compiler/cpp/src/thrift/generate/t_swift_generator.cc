@@ -131,9 +131,6 @@ public:
   void render_const_value(ostream& out,
                           t_type* type,
                           t_const_value* value);
-  void render_const_value_collection(ostream& out,
-                        t_type* etype,
-                        t_const_value* value);
   void print_doc(ostream& out, t_doc* tdoc, bool should_indent);
   void print_struct_init_doc(ostream& out, t_struct* tstruct, const vector<t_field*>& fields, bool all);
 
@@ -158,7 +155,6 @@ public:
   void generate_swift_struct_telemetry_object_extension(ofstream& out, t_struct* tstruct);
   void generate_swift_struct_telemetry_event_extension(ofstream& out, t_struct* tstruct);
   void telemetry_dictionary_value(ofstream& out, t_type* type, string property_name);
-  void telemetry_collection_value(ofstream& out, t_type* key_type, string property_name);
   void generate_swift_struct_thrift_extension(ofstream& out,
                                               t_struct* tstruct,
                                               bool is_result,
@@ -870,6 +866,14 @@ void t_swift_generator::generate_swift_struct_telemetry_object_extension(ofstrea
 
   for (const auto& member : tstruct->get_members()) {
     bool optional = field_is_optional(member);
+    t_type* type = get_true_type(member->get_type());
+
+    // restricting set functionality to special cases, excluding from telemetry dictionary
+    if(type->is_set())
+    {
+      continue;
+    }
+
     if (optional) {
       out << indent() << "if let " << struct_property_name(member) << " = " << struct_property_name(member);
       block_open(out);
@@ -952,55 +956,10 @@ void t_swift_generator::telemetry_dictionary_value(ofstream& out, t_type* type, 
     out << ".string(" << property_name << ".telemetryName())";
   } else if (type->is_struct()) {
     out << "TelemetryValue(" << property_name << ")";
-  } else if (type->is_list()) {
-    t_list *tlist = (t_list*)type;
-    telemetry_collection_value(out, tlist->get_elem_type(), property_name);
-  } else if (type->is_set()) {
-    t_set *tset = (t_set*)type;
-    telemetry_collection_value(out, tset->get_elem_type(), property_name);
-  }
+  } 
   else {
     throw "compiler error: invalid type " + type->get_name();
   }
-}
-
-/**
- * Helper to convert collection to a TelemetryObject that can be serializable
- * when sending event as a telemetry dictionary
- *
- */
-void t_swift_generator::telemetry_collection_value(ofstream& out, t_type* key_type, string property_name) {
-  out << ".string({";
-
-  indent_up();
-  out << endl;
-
-  out << indent() << "var stringList: [String] = []" << endl;
-  out << indent() << "for item in " << property_name;
-
-  block_open(out);
-
-  out << indent() << "stringList.append(";
-
-  if (key_type->is_string()) {
-    out << "item";
-  } else if (key_type->is_enum()) {
-    out << "item.telemetryName()";
-  }
-  else {
-    throw "compiler error: unsupported key type for map " + key_type->get_name();
-  }
-
-  out << ");";
-
-  out << endl;
-
-  block_close(out);
-
-  out << indent() << "return stringList.joined(separator: \",\")" << endl;
-
-  block_close(out, false);
-  out << "())";
 }
 
 /**
@@ -2159,12 +2118,7 @@ string t_swift_generator::type_name(t_type* ttype, bool is_optional, bool is_for
     }
   } else if (ttype->is_list()) {
     t_list *list = (t_list *)ttype;
-    if (exclude_thrift_types_) {
-      result = "[" + type_name(list->get_elem_type()) + "]";
-    }
-    else {
-      result = "TList<" + type_name(list->get_elem_type()) + ">";
-    }
+    result = "TList<" + type_name(list->get_elem_type()) + ">";
   }
   else {
     result = ttype->get_name();
@@ -2308,41 +2262,27 @@ void t_swift_generator::render_const_value(ostream& out,
     }
 
     out << "]";
-
-  } else if (type->is_list()) {
-    t_type* etype = ((t_list*)type)->get_elem_type();
-    render_const_value_collection(out, etype, value);
   } else if (type->is_set()) {
     t_type* etype = ((t_set*)type)->get_elem_type();
-    render_const_value_collection(out, etype, value);
+    out << "[";
+
+    const vector<t_const_value*>& val = value->get_list();
+    vector<t_const_value*>::const_iterator v_iter;
+
+    for (v_iter = val.begin(); v_iter != val.end();) {
+
+      render_const_value(out, etype, *v_iter);
+
+      if (++v_iter != val.end()) {
+        out << ", ";
+      }
+    }
+
+    out << "]";
   } else {
     throw "compiler error: no const of type " + type->get_name();
   }
 
-}
-
-/**
- * Helper to render a collection of constants such as a set or list (as would be seen after an '=')
- *
- */
-void t_swift_generator::render_const_value_collection(ostream& out,
-                                             t_type* etype,
-                                             t_const_value* value) {
-  out << "[";
-
-  const vector<t_const_value*>& val = value->get_list();
-  vector<t_const_value*>::const_iterator v_iter;
-
-  for (v_iter = val.begin(); v_iter != val.end();) {
-
-    render_const_value(out, etype, *v_iter);
-
-    if (++v_iter != val.end()) {
-      out << ", ";
-    }
-  }
-
-  out << "]";
 }
 
 /**
