@@ -956,7 +956,7 @@ void t_swift_generator::telemetry_dictionary_value(ofstream& out, t_type* type, 
     out << "TelemetryValue(" << property_name << ")";
   } 
   else {
-    throw "compiler error: invalid type (" + type->get_name() + ") for property \"" + property_name + "\"";
+    throw "compiler error: invalid type (" + type_name(type) + ") for property \"" + property_name + "\"";
   }
 }
 
