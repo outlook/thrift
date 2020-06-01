@@ -866,6 +866,12 @@ void t_swift_generator::generate_swift_struct_telemetry_object_extension(ofstrea
 
   for (const auto& member : tstruct->get_members()) {
     bool optional = field_is_optional(member);
+
+    // types labeled as NonTelemetry will not be in the resulting telemetry dictionary
+    if (boost::algorithm::ends_with(type_name(member->get_type()), "NonTelemetry")) {
+      continue;
+    }
+
     if (optional) {
       out << indent() << "if let " << struct_property_name(member) << " = " << struct_property_name(member);
       block_open(out);
@@ -948,9 +954,9 @@ void t_swift_generator::telemetry_dictionary_value(ofstream& out, t_type* type, 
     out << ".string(" << property_name << ".telemetryName())";
   } else if (type->is_struct()) {
     out << "TelemetryValue(" << property_name << ")";
-  }
+  } 
   else {
-    throw "compiler error: invalid type " + type->get_name();
+    throw "compiler error: invalid type (" + type_name(type) + ") for property \"" + property_name + "\"";
   }
 }
 
@@ -2102,7 +2108,12 @@ string t_swift_generator::type_name(t_type* ttype, bool is_optional, bool is_for
     }
   } else if (ttype->is_set()) {
     t_set *set = (t_set *)ttype;
-    result = "TSet<" + type_name(set->get_elem_type()) + ">";
+    if (exclude_thrift_types_) {
+      result = "[" + type_name(set->get_elem_type()) + "]";
+    }
+    else {
+      result = "TSet<" + type_name(set->get_elem_type()) + ">";
+    }
   } else if (ttype->is_list()) {
     t_list *list = (t_list *)ttype;
     result = "TList<" + type_name(list->get_elem_type()) + ">";
@@ -2249,39 +2260,16 @@ void t_swift_generator::render_const_value(ostream& out,
     }
 
     out << "]";
-
-  } else if (type->is_list()) {
-
-    out << "[";
-
-    t_type* etype = ((t_list*)type)->get_elem_type();
-
-    const map<t_const_value*, t_const_value*>& val = value->get_map();
-    map<t_const_value*, t_const_value*>::const_iterator v_iter;
-
-    for (v_iter = val.begin(); v_iter != val.end();) {
-
-      render_const_value(out, etype, v_iter->first);
-
-      if (++v_iter != val.end()) {
-        out << ", ";
-      }
-    }
-
-    out << "]";
-
   } else if (type->is_set()) {
-
+    t_type* etype = ((t_set*)type)->get_elem_type();
     out << "[";
 
-    t_type* etype = ((t_set*)type)->get_elem_type();
-
-    const map<t_const_value*, t_const_value*>& val = value->get_map();
-    map<t_const_value*, t_const_value*>::const_iterator v_iter;
+    const vector<t_const_value*>& val = value->get_list();
+    vector<t_const_value*>::const_iterator v_iter;
 
     for (v_iter = val.begin(); v_iter != val.end();) {
 
-      render_const_value(out, etype, v_iter->first);
+      render_const_value(out, etype, *v_iter);
 
       if (++v_iter != val.end()) {
         out << ", ";
@@ -2289,7 +2277,6 @@ void t_swift_generator::render_const_value(ostream& out,
     }
 
     out << "]";
-
   } else {
     throw "compiler error: no const of type " + type->get_name();
   }
