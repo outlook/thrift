@@ -866,11 +866,9 @@ void t_swift_generator::generate_swift_struct_telemetry_object_extension(ofstrea
 
   for (const auto& member : tstruct->get_members()) {
     bool optional = field_is_optional(member);
-    t_type* type = get_true_type(member->get_type());
 
-    // restricting set functionality to special cases, excluding from telemetry dictionary
-    if(type->is_set())
-    {
+    // types labeled as NonTelemetry will not be in the resulting telemetry dictionary
+    if (boost::algorithm::ends_with(type_name(member->get_type()), "NonTelemetry")) {
       continue;
     }
 
@@ -958,7 +956,7 @@ void t_swift_generator::telemetry_dictionary_value(ofstream& out, t_type* type, 
     out << "TelemetryValue(" << property_name << ")";
   } 
   else {
-    throw "compiler error: invalid type " + type->get_name();
+    throw "compiler error: invalid type (" + type->get_name() + ") for property \"" + property_name + "\"";
   }
 }
 
