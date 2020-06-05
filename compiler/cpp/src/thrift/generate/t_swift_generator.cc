@@ -2109,7 +2109,7 @@ string t_swift_generator::type_name(t_type* ttype, bool is_optional, bool is_for
   } else if (ttype->is_set()) {
     t_set *set = (t_set *)ttype;
     if (exclude_thrift_types_) {
-      result = "[" + type_name(set->get_elem_type()) + "]";
+      result = "Set<" + type_name(set->get_elem_type()) + ">";
     }
     else {
       result = "TSet<" + type_name(set->get_elem_type()) + ">";
@@ -2262,7 +2262,7 @@ void t_swift_generator::render_const_value(ostream& out,
     out << "]";
   } else if (type->is_set()) {
     t_type* etype = ((t_set*)type)->get_elem_type();
-    out << "[";
+    out << "Set([";
 
     const vector<t_const_value*>& val = value->get_list();
     vector<t_const_value*>::const_iterator v_iter;
@@ -2276,7 +2276,7 @@ void t_swift_generator::render_const_value(ostream& out,
       }
     }
 
-    out << "]";
+    out << "])";
   } else {
     throw "compiler error: no const of type " + type->get_name();
   }
