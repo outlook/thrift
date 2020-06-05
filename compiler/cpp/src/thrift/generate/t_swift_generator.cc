@@ -2262,7 +2262,7 @@ void t_swift_generator::render_const_value(ostream& out,
     out << "]";
   } else if (type->is_set()) {
     t_type* etype = ((t_set*)type)->get_elem_type();
-    out << "Set<" << type_name(etype) << ">([";
+    out << "Set([";
 
     const vector<t_const_value*>& val = value->get_list();
     vector<t_const_value*>::const_iterator v_iter;
