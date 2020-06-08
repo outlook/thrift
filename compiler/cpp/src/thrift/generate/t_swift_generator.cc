@@ -323,9 +323,6 @@ public protocol TelemetryObject {
 }
 
 public protocol TelemetryEvent: TelemetryObject {
-  var eventName: String { get }
-  var propertiesGeneral: OTPropertiesGeneral { get set }
-  var diagnosticPrivacyLevel: OTPrivacyLevel { get }
 }
 
 public enum TelemetryValue: Equatable {
