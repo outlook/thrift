@@ -322,8 +322,7 @@ public protocol TelemetryObject {
   func telemetryDictionary() -> TelemetryDictionary
 }
 
-public protocol TelemetryEvent: TelemetryObject {
-}
+public protocol TelemetryEvent: TelemetryObject { }
 
 public enum TelemetryValue: Equatable {
   case string(String)
