@@ -322,11 +322,7 @@ public protocol TelemetryObject {
   func telemetryDictionary() -> TelemetryDictionary
 }
 
-public protocol TelemetryEvent: TelemetryObject {
-  var eventName: String { get }
-  var propertiesGeneral: OTPropertiesGeneral { get set }
-  var diagnosticPrivacyLevel: OTPrivacyLevel { get }
-}
+public protocol TelemetryEvent: TelemetryObject { }
 
 public enum TelemetryValue: Equatable {
   case string(String)
@@ -2262,21 +2258,26 @@ void t_swift_generator::render_const_value(ostream& out,
     out << "]";
   } else if (type->is_set()) {
     t_type* etype = ((t_set*)type)->get_elem_type();
-    out << "Set([";
 
     const vector<t_const_value*>& val = value->get_list();
     vector<t_const_value*>::const_iterator v_iter;
 
-    for (v_iter = val.begin(); v_iter != val.end();) {
-
-      render_const_value(out, etype, *v_iter);
-
-      if (++v_iter != val.end()) {
-        out << ", ";
-      }
+    if (val.empty()) {
+      out << "Set<" + type_name(etype) + ">()";
     }
+    else {
+      out << "Set([";
+      for (v_iter = val.begin(); v_iter != val.end();) {
 
-    out << "])";
+        render_const_value(out, etype, *v_iter);
+
+        if (++v_iter != val.end()) {
+          out << ", ";
+        }
+      }
+
+      out << "])";
+    }
   } else {
     throw "compiler error: no const of type " + type->get_name();
   }
