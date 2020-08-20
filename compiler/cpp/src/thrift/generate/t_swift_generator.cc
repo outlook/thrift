@@ -91,7 +91,6 @@ public:
         exclude_printable_ = true;
       } else if( iter->first.compare("separate_files") == 0) {
         separate_files_ = true;
-      }
       } else if( iter->first.compare("struct") == 0) {
         struct_ = true;
       }
