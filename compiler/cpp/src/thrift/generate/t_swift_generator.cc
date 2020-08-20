@@ -68,6 +68,7 @@ public:
     exclude_equatable_ = false;
     exclude_printable_ = false;
     separate_files_ = false;
+    struct_ = false;
 
     for( iter = parsed_options.begin(); iter != parsed_options.end(); ++iter) {
       if( iter->first.compare("log_unexpected") == 0) {
@@ -90,6 +91,8 @@ public:
         exclude_printable_ = true;
       } else if( iter->first.compare("separate_files") == 0) {
         separate_files_ = true;
+      } else if( iter->first.compare("struct") == 0) {
+        struct_ = true;
       }
       else {
         throw "unknown option swift:" + iter->first;
@@ -282,6 +285,7 @@ private:
   bool exclude_equatable_;
   bool exclude_printable_;
   bool separate_files_;
+  bool struct_;
 
   set<string> swift_reserved_words_;
 };
@@ -592,8 +596,9 @@ void t_swift_generator::generate_swift_struct(ofstream& out,
   print_doc(out, tstruct, false);
 
   string visibility = is_private ? "private" : "public";
+  string object_type = struct_ ? "struct" : "final class";
 
-  out << indent() << visibility << " final class " << tstruct->get_name();
+  out << indent() << visibility << " " << object_type << " " << tstruct->get_name();
 
   if (tstruct->is_xception()) {
     out << " : ErrorType";
@@ -950,7 +955,7 @@ void t_swift_generator::telemetry_dictionary_value(ofstream& out, t_type* type, 
     out << ".string(" << property_name << ".telemetryName())";
   } else if (type->is_struct()) {
     out << "TelemetryValue(" << property_name << ")";
-  } 
+  }
   else {
     throw "compiler error: invalid type (" + type_name(type) + ") for property \"" + property_name + "\"";
   }
@@ -2655,4 +2660,5 @@ THRIFT_REGISTER_GENERATOR(
     "                     Do not generate Equatable and Hashable implementations\n"
     "    exclude_printable:\n"
     "                     Do not generate CustomStringConvertible implementation\n"
-    "    separate_files:  Create a separate file for each type\n")
+    "    separate_files:  Create a separate file for each type\n"
+    "    struct:          Create structs instead of classes\n")
