@@ -418,9 +418,11 @@ void t_swift_generator::close_generator() {
  * @param ttypedef The type definition
  */
 void t_swift_generator::generate_typedef(t_typedef* ttypedef) {
-  f_decl_ << indent() << "public typealias " << ttypedef->get_symbolic()
-          << " = " << type_name(ttypedef->get_type()) << endl;
-  f_decl_ << endl;
+  if (!boost::algorithm::ends_with(ttypedef->get_symbolic(), "TelemetryMetadataOnly")) {
+    f_decl_ << indent() << "public typealias " << ttypedef->get_symbolic()
+            << " = " << type_name(ttypedef->get_type()) << endl;
+    f_decl_ << endl;
+  }
 }
 
 /**
