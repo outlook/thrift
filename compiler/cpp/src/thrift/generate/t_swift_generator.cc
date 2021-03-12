@@ -418,6 +418,10 @@ void t_swift_generator::close_generator() {
  * @param ttypedef The type definition
  */
 void t_swift_generator::generate_typedef(t_typedef* ttypedef) {
+  if (boost::algorithm::ends_with(ttypedef->get_symbolic(), "TeleMetadataOnly")) {
+    return;
+  }
+
   f_decl_ << indent() << "public typealias " << ttypedef->get_symbolic()
           << " = " << type_name(ttypedef->get_type()) << endl;
   f_decl_ << endl;
@@ -522,6 +526,9 @@ void t_swift_generator::generate_consts(vector<t_const*> consts) {
   vector<t_const*>::iterator c_iter;
   for (c_iter = consts.begin(); c_iter != consts.end(); ++c_iter) {
     t_type* type = (*c_iter)->get_type();
+    if (boost::algorithm::ends_with(type_name(type), "TeleMetadataOnly")) {
+      continue;
+    }
     const_interface << "public let " << capitalize((*c_iter)->get_name()) << " : " << type_name(type) << " = ";
     render_const_value(const_interface, type, (*c_iter)->get_value());
     const_interface << endl << endl;
@@ -664,7 +671,7 @@ void t_swift_generator::generate_swift_struct_init(ofstream& out,
 
   bool first=true;
   for (m_iter = members.begin(); m_iter != members.end();) {
-    if (all || !field_is_optional(*m_iter)) {
+    if ((all || !field_is_optional(*m_iter)) && !boost::algorithm::ends_with(type_name((*m_iter)->get_type()), "TeleMetadataOnly")) {
       if (first) {
         first = false;
       }
@@ -681,7 +688,8 @@ void t_swift_generator::generate_swift_struct_init(ofstream& out,
   block_open(out);
 
   for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
-    if (all || (*m_iter)->get_req() == t_field::T_REQUIRED || (*m_iter)->get_req() == t_field::T_OPT_IN_REQ_OUT) {
+    if ((all || (*m_iter)->get_req() == t_field::T_REQUIRED || (*m_iter)->get_req() == t_field::T_OPT_IN_REQ_OUT) &&
+      !boost::algorithm::ends_with(type_name((*m_iter)->get_type()), "TeleMetadataOnly")) {
       out << indent() << "self." << struct_property_name(*m_iter) << " = "
           << struct_property_name(*m_iter) << endl;
     }
@@ -2389,6 +2397,9 @@ void t_swift_generator::print_struct_init_doc(ostream& out, t_struct* tstruct, c
  * @param tfield The field to declare a property for
  */
 string t_swift_generator::declare_property(t_field* tfield, bool is_private) {
+  if (boost::algorithm::ends_with(type_name(tfield->get_type()), "TeleMetadataOnly")) {
+    return;
+  }
 
   ostringstream render;
 
