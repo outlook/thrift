@@ -2397,11 +2397,11 @@ void t_swift_generator::print_struct_init_doc(ostream& out, t_struct* tstruct, c
  * @param tfield The field to declare a property for
  */
 string t_swift_generator::declare_property(t_field* tfield, bool is_private) {
-  if (boost::algorithm::ends_with(type_name(tfield->get_type()), "TeleMetadataOnly")) {
-    return;
-  }
-
   ostringstream render;
+
+  if (boost::algorithm::ends_with(type_name(tfield->get_type()), "TeleMetadataOnly")) {
+    return render.str();
+  }
 
   print_doc(render, tfield, true);
 
