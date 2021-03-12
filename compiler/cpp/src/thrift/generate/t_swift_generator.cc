@@ -877,7 +877,8 @@ void t_swift_generator::generate_swift_struct_telemetry_object_extension(ofstrea
     bool optional = field_is_optional(member);
 
     // types labeled as NonTelemetry will not be in the resulting telemetry dictionary
-    if (boost::algorithm::ends_with(type_name(member->get_type()), "NonTelemetry")) {
+    if (boost::algorithm::ends_with(type_name(member->get_type()), "NonTelemetry") ||
+      boost::algorithm::ends_with(type_name(member->get_type()), "TeleMetadataOnly")) {
       continue;
     }
 
