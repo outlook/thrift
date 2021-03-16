@@ -43,6 +43,7 @@ using std::stringstream;
 using std::vector;
 
 static const string endl = "\n"; // avoid ostream << std::endl flushes
+static const string teleMetadataOnlySuffix = "TeleMetadataOnly";
 
 /**
  * Swift code generator.
@@ -263,6 +264,13 @@ private:
     return false;
   }
 
+  /**
+   * Check if this type is telemetry metadata only (name ends with TeleMetadataOnly)
+   */
+  bool is_tele_metadata_only(const std::string& name) {
+    return boost::algorithm::ends_with(name, teleMetadataOnlySuffix);
+  }
+
   string constants_declarations_;
 
   /**
@@ -418,7 +426,7 @@ void t_swift_generator::close_generator() {
  * @param ttypedef The type definition
  */
 void t_swift_generator::generate_typedef(t_typedef* ttypedef) {
-  if (boost::algorithm::ends_with(ttypedef->get_symbolic(), "TeleMetadataOnly")) {
+  if (is_tele_metadata_only(ttypedef->get_symbolic())) {
     return;
   }
 
@@ -526,7 +534,7 @@ void t_swift_generator::generate_consts(vector<t_const*> consts) {
   vector<t_const*>::iterator c_iter;
   for (c_iter = consts.begin(); c_iter != consts.end(); ++c_iter) {
     t_type* type = (*c_iter)->get_type();
-    if (boost::algorithm::ends_with(type_name(type), "TeleMetadataOnly")) {
+    if (is_tele_metadata_only(type_name(type))) {
       continue;
     }
     const_interface << "public let " << capitalize((*c_iter)->get_name()) << " : " << type_name(type) << " = ";
@@ -671,7 +679,7 @@ void t_swift_generator::generate_swift_struct_init(ofstream& out,
 
   bool first=true;
   for (m_iter = members.begin(); m_iter != members.end();) {
-    if ((all || !field_is_optional(*m_iter)) && !boost::algorithm::ends_with(type_name((*m_iter)->get_type()), "TeleMetadataOnly")) {
+    if ((all || !field_is_optional(*m_iter)) && !is_tele_metadata_only(type_name((*m_iter)->get_type()))) {
       if (first) {
         first = false;
       }
@@ -689,7 +697,7 @@ void t_swift_generator::generate_swift_struct_init(ofstream& out,
 
   for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
     if ((all || (*m_iter)->get_req() == t_field::T_REQUIRED || (*m_iter)->get_req() == t_field::T_OPT_IN_REQ_OUT) &&
-      !boost::algorithm::ends_with(type_name((*m_iter)->get_type()), "TeleMetadataOnly")) {
+      !is_tele_metadata_only(type_name((*m_iter)->get_type()))) {
       out << indent() << "self." << struct_property_name(*m_iter) << " = "
           << struct_property_name(*m_iter) << endl;
     }
@@ -878,7 +886,7 @@ void t_swift_generator::generate_swift_struct_telemetry_object_extension(ofstrea
 
     // types labeled as NonTelemetry will not be in the resulting telemetry dictionary
     if (boost::algorithm::ends_with(type_name(member->get_type()), "NonTelemetry") ||
-      boost::algorithm::ends_with(type_name(member->get_type()), "TeleMetadataOnly")) {
+      is_tele_metadata_only(type_name(member->get_type()))) {
       continue;
     }
 
@@ -2400,7 +2408,7 @@ void t_swift_generator::print_struct_init_doc(ostream& out, t_struct* tstruct, c
 string t_swift_generator::declare_property(t_field* tfield, bool is_private) {
   ostringstream render;
 
-  if (boost::algorithm::ends_with(type_name(tfield->get_type()), "TeleMetadataOnly")) {
+  if (is_tele_metadata_only(type_name(tfield->get_type()))) {
     return render.str();
   }
 
@@ -2652,7 +2660,6 @@ void t_swift_generator::create_file(ofstream& out, string file_name) {
 
   out << swift_imports() << swift_thrift_imports() << endl;
 }
-
 
 THRIFT_REGISTER_GENERATOR(
     swift,
