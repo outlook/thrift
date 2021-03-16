@@ -180,3 +180,5 @@ We have [comprehensive building instructions for docker](build/docker/README.md)
 The following configuration command is use when building the binary for `telemetry` repo:
 
 	./configure --enable-libs=no --enable-tests=no --enable-plugin=no --enable-tutorial=no
+
+The output binary of the `make` command is available at /compiler/cpp/thrift
