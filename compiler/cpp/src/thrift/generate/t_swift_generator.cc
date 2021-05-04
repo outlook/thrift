@@ -863,7 +863,7 @@ void t_swift_generator::generate_swift_struct_telemetry_object_extension(ofstrea
 
   out << endl;
 
-  out << indent() << "var telemetryData = TelemetryDictionary()" << endl;
+  out << indent() << "var telemetryData = defaultProperties()" << endl;
 
   for (const auto& member : tstruct->get_members()) {
     bool optional = field_is_optional(member);
