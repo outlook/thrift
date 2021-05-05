@@ -842,7 +842,7 @@ void t_swift_generator::generate_swift_struct_telemetry_event_extension(ofstream
     return;
   }
 
-  indent(out) << "extension " << tstruct->get_name() << " : TelemetryEvent";
+  indent(out) << "extension " << tstruct->get_name() << " : TelemetryEventWithCommonProperties";
   block_open(out);
   block_close(out);
 
@@ -866,7 +866,7 @@ void t_swift_generator::generate_swift_struct_telemetry_object_extension(ofstrea
   out << endl;
 
   if (contains_event_name(tstruct)) {
-    out << indent() << "var telemetryData = defaultProperties()" << endl;
+    out << indent() << "var telemetryData = baseProperties()" << endl;
   } else {
     out << indent() << "var telemetryData = TelemetryDictionary()" << endl;
   }
