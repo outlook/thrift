@@ -155,6 +155,7 @@ public:
   void generate_swift_struct_equatable_extension(ofstream& out,
                                                  t_struct* tstruct,
                                                  bool is_private);
+  bool contains_event_name(t_struct* tstruct);
   void generate_swift_struct_telemetry_object_extension(ofstream& out, t_struct* tstruct);
   void generate_swift_struct_telemetry_event_extension(ofstream& out, t_struct* tstruct);
   void telemetry_dictionary_value(ofstream& out, t_type* type, string property_name);
@@ -820,27 +821,28 @@ void t_swift_generator::generate_swift_struct_implementation(ofstream& out,
   out << endl << endl;
 }
 
+bool t_swift_generator::contains_event_name(t_struct* tstruct) {
+  for (const auto& member : tstruct->get_members()) {
+    if (member->get_name() == "event_name") {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 /**
  * Generate the TelemetryEvent protocol implementation
  *
  * @param tstruct The structure definition
  */
 void t_swift_generator::generate_swift_struct_telemetry_event_extension(ofstream& out, t_struct* tstruct) {
-  bool contains_event_name = false;
-
-  for (const auto& member : tstruct->get_members()) {
-    if (member->get_name() == "event_name") {
-      contains_event_name = true;
-      break;
-    }
-  }
-
-  if (!contains_event_name) {
+  if (!contains_event_name(tstruct)) {
     // This is not an event struct, do not add the protocol
     return;
   }
 
-  indent(out) << "extension " << tstruct->get_name() << " : TelemetryEvent";
+  indent(out) << "extension " << tstruct->get_name() << " : TelemetryEventWithCommonProperties";
   block_open(out);
   block_close(out);
 
@@ -863,7 +865,11 @@ void t_swift_generator::generate_swift_struct_telemetry_object_extension(ofstrea
 
   out << endl;
 
-  out << indent() << "var telemetryData = TelemetryDictionary()" << endl;
+  if (contains_event_name(tstruct)) {
+    out << indent() << "var telemetryData = baseProperties()" << endl;
+  } else {
+    out << indent() << "var telemetryData = TelemetryDictionary()" << endl;
+  }
 
   for (const auto& member : tstruct->get_members()) {
     bool optional = field_is_optional(member);
