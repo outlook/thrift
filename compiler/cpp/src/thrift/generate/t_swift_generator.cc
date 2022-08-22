@@ -894,7 +894,7 @@ void t_swift_generator::generate_swift_struct_telemetry_object_extension(ofstrea
     string pii_kind = "nil";
     std::map<string, string>::iterator it = member->annotations_.find("PIIKind");
     if (it != ttype->annotations_.end()) {
-      pii_kind = "." + it->second;
+      pii_kind = it->second;
     }
     telemetry_dictionary_value(out, member->get_type(), struct_property_name(member), pii_kind);
 
