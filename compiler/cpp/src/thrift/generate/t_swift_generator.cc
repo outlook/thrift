@@ -333,9 +333,13 @@ public protocol TelemetryObject {
 
 public protocol TelemetryEvent: TelemetryObject { }
 
+public enum OTPiiKind { }
+
 public enum TelemetryValue: Equatable {
   case string(String, piiKind: OTPiiKind?)
   case bool(Bool, piiKind: OTPiiKind?)
+  case int(Int, piiKind: OTPiiKind?)
+  case double(Double, piiKind: OTPiiKind?)
   case dictionary(TelemetryDictionary)
 }
 
