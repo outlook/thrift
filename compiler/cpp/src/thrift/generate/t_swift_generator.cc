@@ -330,25 +330,9 @@ public protocol TelemetryObject {
 public protocol TelemetryEvent: TelemetryObject { }
 
 public enum TelemetryValue: Equatable {
-  case string(String)
-  case bool(Bool)
+  case string(String, piiKind: OTPiiKind?)
+  case bool(Bool, piiKind: OTPiiKind?)
   case dictionary(TelemetryDictionary)
-
-  init(_ value: Any) {
-    if let string = value as? String {
-      self = .string(string)
-    }
-    else if let bool = value as? Bool {
-      self = .bool(bool)
-    }
-    else if let telemetryObject = value as? TelemetryObject {
-      self = .dictionary(telemetryObject.telemetryDictionary())
-    }
-    else {
-      // Convert other types to string
-      self = .string("\(value)")
-    }
-  }
 }
 
 )objc";
@@ -908,14 +892,24 @@ void t_swift_generator::telemetry_dictionary_value(ofstream& out, t_type* type, 
     t_base_type::t_base tbase = ((t_base_type*)type)->get_base();
     switch (tbase) {
     case t_base_type::TYPE_STRING:
+      out << ".string(" << property_name << ", piiKind: nil)";
+      break;
+
     case t_base_type::TYPE_BOOL:
+      out << ".bool(" << property_name << ", piiKind: nil)";
+      break;
+
     case t_base_type::TYPE_I8:
     case t_base_type::TYPE_I16:
     case t_base_type::TYPE_I32:
     case t_base_type::TYPE_I64:
-    case t_base_type::TYPE_DOUBLE:
-      out << "TelemetryValue(" << property_name << ")";
+      out << ".int(" << property_name << ", piiKind: nil)";
       break;
+
+    case t_base_type::TYPE_DOUBLE:
+      out << ".double(" << property_name << ", piiKind: nil)";
+      break;
+
     default:
       throw "compiler error: invalid base type " + type->get_name();
       break;
@@ -960,7 +954,7 @@ void t_swift_generator::telemetry_dictionary_value(ofstream& out, t_type* type, 
   } else if (type->is_enum()) {
     out << ".string(" << property_name << ".telemetryName())";
   } else if (type->is_struct()) {
-    out << "TelemetryValue(" << property_name << ")";
+    out << ".dictionary(" << property_name << ".telemetryDictionary())";
   }
   else {
     throw "compiler error: invalid type (" + type_name(type) + ") for property \"" + property_name + "\"";
