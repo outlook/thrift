@@ -31,13 +31,13 @@ jobs:
           export CFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
           export CXXFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
 
-          cd compiler/cpp
+          cd ./compiler/cpp
           make
 
       - name: Add executable permission
-        run: chmod +x ./thrift
+        run: chmod +x ./compiler/cpp/thrift
 
       - uses: actions/upload-artifact@v3
         with:
           name: thrift
-          path: ./thrift
+          path: ./compiler/cpp/thrift
