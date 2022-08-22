@@ -68,6 +68,7 @@ public:
     exclude_equatable_ = false;
     exclude_printable_ = false;
     separate_files_ = false;
+    single_init_ = false;
     struct_ = false;
 
     for( iter = parsed_options.begin(); iter != parsed_options.end(); ++iter) {
@@ -91,6 +92,8 @@ public:
         exclude_printable_ = true;
       } else if( iter->first.compare("separate_files") == 0) {
         separate_files_ = true;
+      } else if( iter->first.compare("single_init") == 0) {
+        single_init_ = true;
       } else if( iter->first.compare("struct") == 0) {
         struct_ = true;
       }
@@ -143,7 +146,8 @@ public:
   void generate_swift_struct_init(ofstream& out,
                                   t_struct* tstruct,
                                   bool all,
-                                  bool is_private);
+                                  bool is_private,
+                                  bool optional_param_default_value);
 
   void generate_swift_struct_implementation(ofstream& out,
                                             t_struct* tstruct,
@@ -158,7 +162,7 @@ public:
   bool contains_event_name(t_struct* tstruct);
   void generate_swift_struct_telemetry_object_extension(ofstream& out, t_struct* tstruct);
   void generate_swift_struct_telemetry_event_extension(ofstream& out, t_struct* tstruct);
-  void telemetry_dictionary_value(ofstream& out, t_type* type, string property_name);
+  void telemetry_dictionary_value(ofstream& out, t_type* type, string property_name, string pii_kind);
   void generate_swift_struct_thrift_extension(ofstream& out,
                                               t_struct* tstruct,
                                               bool is_result,
@@ -286,6 +290,7 @@ private:
   bool exclude_equatable_;
   bool exclude_printable_;
   bool separate_files_;
+  bool single_init_;
   bool struct_;
 
   set<string> swift_reserved_words_;
@@ -329,26 +334,14 @@ public protocol TelemetryObject {
 
 public protocol TelemetryEvent: TelemetryObject { }
 
-public enum TelemetryValue: Equatable {
-  case string(String)
-  case bool(Bool)
-  case dictionary(TelemetryDictionary)
+public enum OTPiiKind { }
 
-  init(_ value: Any) {
-    if let string = value as? String {
-      self = .string(string)
-    }
-    else if let bool = value as? Bool {
-      self = .bool(bool)
-    }
-    else if let telemetryObject = value as? TelemetryObject {
-      self = .dictionary(telemetryObject.telemetryDictionary())
-    }
-    else {
-      // Convert other types to string
-      self = .string("\(value)")
-    }
-  }
+public enum TelemetryValue: Equatable {
+  case string(String, piiKind: OTPiiKind?)
+  case bool(Bool, piiKind: OTPiiKind?)
+  case int(Int, piiKind: OTPiiKind?)
+  case double(Double, piiKind: OTPiiKind?)
+  case dictionary(TelemetryDictionary)
 }
 
 )objc";
@@ -628,11 +621,16 @@ void t_swift_generator::generate_swift_struct(ofstream& out,
     out << endl;
   }
 
-  if (struct_has_required_fields(tstruct)) {
-    generate_swift_struct_init(out, tstruct, false, is_private);
+  if (single_init_) {
+    generate_swift_struct_init(out, tstruct, true, is_private, true);
   }
-  if (struct_has_optional_fields(tstruct)) {
-    generate_swift_struct_init(out, tstruct, true, is_private);
+  else {
+    if (struct_has_required_fields(tstruct)) {
+      generate_swift_struct_init(out, tstruct, false, is_private, false);
+    }
+    if (struct_has_optional_fields(tstruct)) {
+      generate_swift_struct_init(out, tstruct, true, is_private, false);
+    }
   }
 
   block_close(out);
@@ -647,11 +645,14 @@ void t_swift_generator::generate_swift_struct(ofstream& out,
  * @param all     Generate init with all or just required properties
  * @param is_private
  *                Is the initializer public or private
+ * @param optional_param_default_value
+ *                Add a default value for optional parameters
  */
 void t_swift_generator::generate_swift_struct_init(ofstream& out,
                                                    t_struct* tstruct,
                                                    bool all,
-                                                   bool is_private) {
+                                                   bool is_private,
+                                                   bool optional_param_default_value) {
 
   const vector<t_field*>& members = tstruct->get_members();
 
@@ -672,8 +673,13 @@ void t_swift_generator::generate_swift_struct_init(ofstream& out,
       else {
         out << ", ";
       }
+
       out << struct_property_name(*m_iter) << ": "
           << maybe_escape_identifier(type_name((*m_iter)->get_type(), field_is_optional(*m_iter)));
+
+      if (field_is_optional(*m_iter) && optional_param_default_value) {
+        out << " = nil";
+      }
     }
     ++m_iter;
   }
@@ -885,7 +891,14 @@ void t_swift_generator::generate_swift_struct_telemetry_object_extension(ofstrea
     }
 
     out << indent() << "telemetryData[\"" << member->get_name() << "\"] = ";
-    telemetry_dictionary_value(out, member->get_type(), struct_property_name(member));
+
+    string pii_kind = "nil";
+    std::map<string, string>::iterator it = member->annotations_.find("PIIKind");
+    if (it != member->annotations_.end()) {
+      pii_kind = it->second;
+    }
+    telemetry_dictionary_value(out, member->get_type(), struct_property_name(member), pii_kind);
+
     out << endl;
 
     if (optional) {
@@ -901,21 +914,31 @@ void t_swift_generator::generate_swift_struct_telemetry_object_extension(ofstrea
   out << endl;
 }
 
-void t_swift_generator::telemetry_dictionary_value(ofstream& out, t_type* type, string property_name) {
+void t_swift_generator::telemetry_dictionary_value(ofstream& out, t_type* type, string property_name, string pii_kind) {
   type = get_true_type(type);
 
   if (type->is_base_type()) {
     t_base_type::t_base tbase = ((t_base_type*)type)->get_base();
     switch (tbase) {
     case t_base_type::TYPE_STRING:
+      out << ".string(" << property_name << ", piiKind: " << pii_kind << ")";
+      break;
+
     case t_base_type::TYPE_BOOL:
+      out << ".bool(" << property_name << ", piiKind: " << pii_kind << ")";
+      break;
+
     case t_base_type::TYPE_I8:
     case t_base_type::TYPE_I16:
     case t_base_type::TYPE_I32:
     case t_base_type::TYPE_I64:
-    case t_base_type::TYPE_DOUBLE:
-      out << "TelemetryValue(" << property_name << ")";
+      out << ".int(" << property_name << ", piiKind: " << pii_kind << ")";
       break;
+
+    case t_base_type::TYPE_DOUBLE:
+      out << ".double(" << property_name << ", piiKind: " << pii_kind << ")";
+      break;
+
     default:
       throw "compiler error: invalid base type " + type->get_name();
       break;
@@ -947,7 +970,7 @@ void t_swift_generator::telemetry_dictionary_value(ofstream& out, t_type* type, 
 
     out << "] = ";
 
-    telemetry_dictionary_value(out, tmap->get_val_type(), "value");
+    telemetry_dictionary_value(out, tmap->get_val_type(), "value", pii_kind);
 
     out << endl;
 
@@ -958,9 +981,9 @@ void t_swift_generator::telemetry_dictionary_value(ofstream& out, t_type* type, 
     block_close(out, false);
     out << "())";
   } else if (type->is_enum()) {
-    out << ".string(" << property_name << ".telemetryName())";
+    out << ".string(" << property_name << ".telemetryName(), piiKind: " << pii_kind << ")";
   } else if (type->is_struct()) {
-    out << "TelemetryValue(" << property_name << ")";
+    out << ".dictionary(" << property_name << ".telemetryDictionary())";
   }
   else {
     throw "compiler error: invalid type (" + type_name(type) + ") for property \"" + property_name + "\"";
@@ -2667,4 +2690,5 @@ THRIFT_REGISTER_GENERATOR(
     "    exclude_printable:\n"
     "                     Do not generate CustomStringConvertible implementation\n"
     "    separate_files:  Create a separate file for each type\n"
+    "    single_init:     Generate a single init function with default values for optional properties\n"
     "    struct:          Create structs instead of classes\n")
