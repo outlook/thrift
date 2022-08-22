@@ -1,0 +1,21 @@
+name: Build
+on: [push]
+jobs:
+  Explore-GitHub-Actions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Boostrap
+        run: ./bootstrap.sh
+
+      - name: Configure
+        run: ./configure
+
+      - name: Make
+        run: make
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: thrift
+          path: ./thrift
