@@ -36,8 +36,8 @@ uses the abstracted stack to build interoperable RPC clients and servers.
 ![Apache Thrift Layered Architecture](doc/images/thrift-layers.png)
 
 Thrift makes it easy for programs written in different programming
-languages to share data and call remote procedures.  With support 
-for [over 20 programming languages](LANGUAGES.md), chances are Thrift 
+languages to share data and call remote procedures.  With support
+for [over 20 programming languages](LANGUAGES.md), chances are Thrift
 supports the ones that you currently use.
 
 Thrift is specifically designed to support non-atomic version changes
@@ -100,49 +100,29 @@ and also by Google's protocol buffers.
 Installation
 ============
 
+Use Homebrew to install the dependencies:
+
+```
+brew install autoconf automake bison pkg-config boost
+```
+
 If you are building from the first time out of the source repository, you will
 need to generate the configure scripts.  (This is not necessary if you
 downloaded a tarball.)  From the top directory, do:
 
-    ./bootstrap.sh
+```
+./bootstrap.sh
+```
 
-Once the configure scripts are generated, thrift can be configured.
 From the top directory, do:
 
-    ./configure
-
-You may need to specify the location of the boost files explicitly.
-If you installed boost in /usr/local, you would run configure as follows:
-
-    ./configure --with-boost=/usr/local
-
-Note that by default the thrift C++ library is typically built with debugging
-symbols included. If you want to customize these options you should use the
-CXXFLAGS option in configure, as such:
-
-    ./configure CXXFLAGS='-g -O2'
-    ./configure CFLAGS='-g -O2'
-    ./configure CPPFLAGS='-DDEBUG_MY_FEATURE'
-
-To enable gcov required options -fprofile-arcs -ftest-coverage enable them:
-
-    ./configure  --enable-coverage
-
-Run ./configure --help to see other configuration options
-
-Please be aware that the Python library will ignore the --prefix option
-and just install wherever Python's distutils puts it (usually along
-the lines of /usr/lib/pythonX.Y/site-packages/).  If you need to control
-where the Python modules are installed, set the PY_PREFIX variable.
-(DESTDIR is respected for Python and C++.)
-
-Make thrift:
-
-	make
-
-From the top directory, become superuser and do:
-
-	make install
+```
+export CXXFLAGS=-Wno-deprecated-copy-with-user-provided-copy
+export PATH="/usr/local/opt/bison/bin:$PATH"
+./configure --enable-libs=no
+cd compiler/cpp
+make
+```
 
 Note that some language packages must be installed manually using build tools
 better suited to those languages (at the time of this writing, this applies
