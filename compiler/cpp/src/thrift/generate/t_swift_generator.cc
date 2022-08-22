@@ -146,7 +146,8 @@ public:
   void generate_swift_struct_init(ofstream& out,
                                   t_struct* tstruct,
                                   bool all,
-                                  bool is_private);
+                                  bool is_private,
+                                  bool optional_param_default_value);
 
   void generate_swift_struct_implementation(ofstream& out,
                                             t_struct* tstruct,
@@ -161,7 +162,7 @@ public:
   bool contains_event_name(t_struct* tstruct);
   void generate_swift_struct_telemetry_object_extension(ofstream& out, t_struct* tstruct);
   void generate_swift_struct_telemetry_event_extension(ofstream& out, t_struct* tstruct);
-  void telemetry_dictionary_value(ofstream& out, t_type* type, string property_name);
+  void telemetry_dictionary_value(ofstream& out, t_type* type, string property_name, string pii_kind);
   void generate_swift_struct_thrift_extension(ofstream& out,
                                               t_struct* tstruct,
                                               bool is_result,
@@ -677,7 +678,7 @@ void t_swift_generator::generate_swift_struct_init(ofstream& out,
           << maybe_escape_identifier(type_name((*m_iter)->get_type(), field_is_optional(*m_iter)));
 
       if (field_is_optional(*m_iter) && optional_param_default_value) {
-        out << " = nil"
+        out << " = nil";
       }
     }
     ++m_iter;
@@ -893,7 +894,7 @@ void t_swift_generator::generate_swift_struct_telemetry_object_extension(ofstrea
 
     string pii_kind = "nil";
     std::map<string, string>::iterator it = member->annotations_.find("PIIKind");
-    if (it != ttype->annotations_.end()) {
+    if (it != member->annotations_.end()) {
       pii_kind = it->second;
     }
     telemetry_dictionary_value(out, member->get_type(), struct_property_name(member), pii_kind);
@@ -969,7 +970,7 @@ void t_swift_generator::telemetry_dictionary_value(ofstream& out, t_type* type, 
 
     out << "] = ";
 
-    telemetry_dictionary_value(out, tmap->get_val_type(), "value");
+    telemetry_dictionary_value(out, tmap->get_val_type(), "value", "");
 
     out << endl;
 
