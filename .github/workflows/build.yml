@@ -1,0 +1,39 @@
+name: Build
+on: [push]
+jobs:
+  Build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: brew install autoconf automake bison pkg-config boost
+
+      - name: Boostrap
+        run: |
+          export PATH="/usr/local/opt/bison/bin:$PATH"
+
+          ./bootstrap.sh
+
+      - name: Configure
+        run: |
+          export PATH="/usr/local/opt/bison/bin:$PATH"
+
+          export CFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
+          export CXXFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
+
+          ./configure
+
+      - name: Make
+        run: |
+          export PATH="/usr/local/opt/bison/bin:$PATH"
+
+          export CFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
+          export CXXFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
+
+          make
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: thrift
+          path: ./thrift
