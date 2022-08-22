@@ -981,7 +981,7 @@ void t_swift_generator::telemetry_dictionary_value(ofstream& out, t_type* type, 
     block_close(out, false);
     out << "())";
   } else if (type->is_enum()) {
-    out << ".string(" << property_name << ".telemetryName())";
+    out << ".string(" << property_name << ".telemetryName(), piiKind: " << pii_kind << ")";
   } else if (type->is_struct()) {
     out << ".dictionary(" << property_name << ".telemetryDictionary())";
   }
