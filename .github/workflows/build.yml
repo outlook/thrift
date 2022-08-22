@@ -17,7 +17,9 @@ jobs:
       - name: Configure
         run: |
           export PATH="/usr/local/opt/bison/bin:$PATH"
-          ./configure
+          export LDFLAGS="-L/usr/local/opt/boost@1.76/lib"
+          export CPPFLAGS="-I/usr/local/opt/boost@1.76/include"
+          ./configure --with-boost=/usr/local/opt/boost@1.76
 
       - name: Make
         run: |
