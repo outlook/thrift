@@ -9,8 +9,8 @@ jobs:
       - name: Install dependencies
         run: brew install autoconf automake bison pkg-config boost
 
-      - name: Add bison to PATH
-        run: echo 'export PATH="/usr/local/opt/bison/bin:$PATH"' >> /Users/runner/.bash_profile
+      - name: Export LDFLAGS
+        run: export LDFLAGS="-L/usr/local/opt/bison/lib"
 
       - name: Boostrap
         run: ./bootstrap.sh
