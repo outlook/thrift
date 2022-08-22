@@ -19,8 +19,8 @@ jobs:
         run: |
           export PATH="/usr/local/opt/bison/bin:$PATH"
 
-          # export CFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
-          # export CXXFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
+          export CFLAGS="-Wdeprecated-copy"
+          export CXXFLAGS="-Wdeprecated-copy"
 
           ./configure
 
@@ -28,8 +28,8 @@ jobs:
         run: |
           export PATH="/usr/local/opt/bison/bin:$PATH"
 
-          # export CFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
-          # export CXXFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
+          export CFLAGS="-Wdeprecated-copy"
+          export CXXFLAGS="-Wdeprecated-copy"
 
           cd compiler/cpp
           make
