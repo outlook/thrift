@@ -1,8 +1,8 @@
 name: Build
 on: [push]
 jobs:
-  Explore-GitHub-Actions:
-    runs-on: ubuntu-latest
+  Build:
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v3
 
