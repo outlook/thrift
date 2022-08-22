@@ -2685,6 +2685,5 @@ THRIFT_REGISTER_GENERATOR(
     "    exclude_printable:\n"
     "                     Do not generate CustomStringConvertible implementation\n"
     "    separate_files:  Create a separate file for each type\n"
-    "    single_init:\n"
-    "                     Generate a single init function with default values for optional properties"
+    "    single_init:     Generate a single init function with default values for optional properties\n"
     "    struct:          Create structs instead of classes\n")
