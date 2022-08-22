@@ -31,6 +31,7 @@ jobs:
           export CFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
           export CXXFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
 
+          cd compiler/cpp
           make
 
       - uses: actions/upload-artifact@v3
