@@ -886,7 +886,14 @@ void t_swift_generator::generate_swift_struct_telemetry_object_extension(ofstrea
     }
 
     out << indent() << "telemetryData[\"" << member->get_name() << "\"] = ";
-    telemetry_dictionary_value(out, member->get_type(), struct_property_name(member));
+
+    string pii_kind = "nil";
+    std::map<string, string>::iterator it = member->annotations_.find("PIIKind");
+    if (it != ttype->annotations_.end()) {
+      pii_kind = "." + it->second;
+    }
+    telemetry_dictionary_value(out, member->get_type(), struct_property_name(member), pii_kind);
+
     out << endl;
 
     if (optional) {
@@ -902,29 +909,29 @@ void t_swift_generator::generate_swift_struct_telemetry_object_extension(ofstrea
   out << endl;
 }
 
-void t_swift_generator::telemetry_dictionary_value(ofstream& out, t_type* type, string property_name) {
+void t_swift_generator::telemetry_dictionary_value(ofstream& out, t_type* type, string property_name, string pii_kind) {
   type = get_true_type(type);
 
   if (type->is_base_type()) {
     t_base_type::t_base tbase = ((t_base_type*)type)->get_base();
     switch (tbase) {
     case t_base_type::TYPE_STRING:
-      out << ".string(" << property_name << ", piiKind: nil)";
+      out << ".string(" << property_name << ", piiKind: " << pii_kind << ")";
       break;
 
     case t_base_type::TYPE_BOOL:
-      out << ".bool(" << property_name << ", piiKind: nil)";
+      out << ".bool(" << property_name << ", piiKind: " << pii_kind << ")";
       break;
 
     case t_base_type::TYPE_I8:
     case t_base_type::TYPE_I16:
     case t_base_type::TYPE_I32:
     case t_base_type::TYPE_I64:
-      out << ".int(" << property_name << ", piiKind: nil)";
+      out << ".int(" << property_name << ", piiKind: " << pii_kind << ")";
       break;
 
     case t_base_type::TYPE_DOUBLE:
-      out << ".double(" << property_name << ", piiKind: nil)";
+      out << ".double(" << property_name << ", piiKind: " << pii_kind << ")";
       break;
 
     default:
