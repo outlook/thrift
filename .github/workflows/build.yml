@@ -7,25 +7,27 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install dependencies
-        run: brew install autoconf automake bison pkg-config boost@1.60
+        run: brew install autoconf automake bison pkg-config boost
 
       - name: Boostrap
         run: |
           export PATH="/usr/local/opt/bison/bin:$PATH"
+
           ./bootstrap.sh
 
       - name: Configure
         run: |
           export PATH="/usr/local/opt/bison/bin:$PATH"
-          export LDFLAGS="-L/usr/local/opt/boost@1.60/lib"
-          export CPPFLAGS="-I/usr/local/opt/boost@1.60/include"
-          ./configure --with-boost=/usr/local/opt/boost@1.60
+
+          ./configure
 
       - name: Make
         run: |
           export PATH="/usr/local/opt/bison/bin:$PATH"
-          export LDFLAGS="-L/usr/local/opt/boost@1.60/lib"
-          export CPPFLAGS="-I/usr/local/opt/boost@1.60/include"
+
+          export CFLAGS=-Wno-deprecated-copy-with-user-provided-copy
+          export CXXFLAGS=-Wno-deprecated-copy-with-user-provided-copy
+
           make
 
       - uses: actions/upload-artifact@v3
