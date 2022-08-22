@@ -110,7 +110,7 @@ public:
     return pendingTaskCountMax_;
   }
 
-  size_t expiredTaskCount() const {
+  size_t expiredTaskCount() {
     Guard g(mutex_);
     return expiredCount_;
   }
