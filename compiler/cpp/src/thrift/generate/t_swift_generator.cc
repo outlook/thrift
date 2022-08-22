@@ -970,7 +970,7 @@ void t_swift_generator::telemetry_dictionary_value(ofstream& out, t_type* type, 
 
     out << "] = ";
 
-    telemetry_dictionary_value(out, tmap->get_val_type(), "value", "");
+    telemetry_dictionary_value(out, tmap->get_val_type(), "value", pii_kind);
 
     out << endl;
 

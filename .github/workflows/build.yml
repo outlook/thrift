@@ -37,7 +37,11 @@ jobs:
       - name: Add executable permission
         run: chmod +x ./compiler/cpp/thrift
 
-      - uses: actions/upload-artifact@v3
+      - name: 'Zip files'
+        run: zip ./thrift.zip ./compiler/cpp/thrift
+
+      - name: 'Upload Artifact'
+        uses: actions/upload-artifact@v2
         with:
-          name: thrift
-          path: ./compiler/cpp/thrift
+          name: thrift.zip
+          path: ./thrift.zip
