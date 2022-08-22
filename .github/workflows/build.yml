@@ -22,6 +22,8 @@ jobs:
       - name: Make
         run: |
           export PATH="/usr/local/opt/bison/bin:$PATH"
+          export LDFLAGS="-L/usr/local/opt/boost@1.76/lib"
+          export CPPFLAGS="-I/usr/local/opt/boost@1.76/include"
           make
 
       - uses: actions/upload-artifact@v3
