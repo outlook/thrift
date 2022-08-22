@@ -25,8 +25,8 @@ jobs:
         run: |
           export PATH="/usr/local/opt/bison/bin:$PATH"
 
-          export CFLAGS=-Wno-deprecated-copy-with-user-provided-copy
-          export CXXFLAGS=-Wno-deprecated-copy-with-user-provided-copy
+          export CFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
+          export CXXFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
 
           make
 
