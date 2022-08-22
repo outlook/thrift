@@ -9,19 +9,20 @@ jobs:
       - name: Install dependencies
         run: brew install autoconf automake bison pkg-config boost
 
-      - name: Export LDFLAGS
-        run: |
-          echo 'export PATH="/usr/local/opt/bison/bin:$PATH"' >> /Users/runner/.bash_profile
-          export LDFLAGS="-L/usr/local/opt/bison/lib"
-
       - name: Boostrap
-        run: ./bootstrap.sh
+        run: |
+          export PATH="/usr/local/opt/bison/bin:$PATH"
+          ./bootstrap.sh
 
       - name: Configure
-        run: ./configure
+        run: |
+          export PATH="/usr/local/opt/bison/bin:$PATH"
+          ./configure
 
       - name: Make
-        run: make
+        run: |
+          export PATH="/usr/local/opt/bison/bin:$PATH"
+          make
 
       - uses: actions/upload-artifact@v3
         with:
