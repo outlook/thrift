@@ -34,6 +34,9 @@ jobs:
           cd compiler/cpp
           make
 
+      - name: Add executable permission
+        run: chmod +x ./thrift
+
       - uses: actions/upload-artifact@v3
         with:
           name: thrift
