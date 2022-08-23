@@ -38,7 +38,7 @@ jobs:
         run: chmod +x ./compiler/cpp/thrift
 
       - name: 'Zip files'
-        run: zip ./thrift.zip ./compiler/cpp/thrift
+        run: zip -j ./thrift.zip ./compiler/cpp/thrift
 
       - name: 'Upload Artifact'
         uses: actions/upload-artifact@v2
