@@ -162,6 +162,7 @@ public:
   bool contains_event_name(t_struct* tstruct);
   void generate_swift_struct_telemetry_object_extension(ofstream& out, t_struct* tstruct);
   void generate_swift_struct_telemetry_event_extension(ofstream& out, t_struct* tstruct);
+  void telemetry_struct_value(ofstream& out, t_struct* tstruct);
   void telemetry_dictionary_value(ofstream& out, t_type* type, string property_name, string pii_kind);
   void generate_swift_struct_thrift_extension(ofstream& out,
                                               t_struct* tstruct,
@@ -877,6 +878,17 @@ void t_swift_generator::generate_swift_struct_telemetry_object_extension(ofstrea
     out << indent() << "var telemetryData = TelemetryDictionary()" << endl;
   }
 
+  telemetry_struct_value(out, tstruct);
+
+  out << indent() << "return telemetryData" << endl;
+
+  block_close(out);
+  block_close(out);
+
+  out << endl;
+}
+
+void telemetry_struct_value(ofstream& out, t_struct* tstruct) {
   for (const auto& member : tstruct->get_members()) {
     bool optional = field_is_optional(member);
 
@@ -890,34 +902,26 @@ void t_swift_generator::generate_swift_struct_telemetry_object_extension(ofstrea
       block_open(out);
     }
 
-    out << indent() << "telemetryData[\"" << member->get_name() << "\"] = ";
-
     string pii_kind = "nil";
     std::map<string, string>::iterator it = member->annotations_.find("PIIKind");
     if (it != member->annotations_.end()) {
       pii_kind = it->second;
     }
-    telemetry_dictionary_value(out, member->get_type(), struct_property_name(member), pii_kind);
 
-    out << endl;
+    telemetry_dictionary_value(out, member->get_type(), struct_property_name(member), pii_kind);
 
     if (optional) {
       block_close(out);
     }
   }
-
-  out << indent() << "return telemetryData" << endl;
-
-  block_close(out);
-  block_close(out);
-
-  out << endl;
 }
 
 void t_swift_generator::telemetry_dictionary_value(ofstream& out, t_type* type, string property_name, string pii_kind) {
   type = get_true_type(type);
 
   if (type->is_base_type()) {
+    out << indent() << "telemetryData[\"" << member->get_name() << "\"] = ";
+
     t_base_type::t_base tbase = ((t_base_type*)type)->get_base();
     switch (tbase) {
     case t_base_type::TYPE_STRING:
@@ -946,17 +950,11 @@ void t_swift_generator::telemetry_dictionary_value(ofstream& out, t_type* type, 
   } else if (type->is_map()) {
     t_map *tmap = (t_map*)type;
 
-    out << ".dictionary({";
-
-    indent_up();
-    out << endl;
-
-    out << indent() << "var dictionary = TelemetryDictionary()" << endl;
     out << indent() << "for (key, value) in " << property_name;
 
     block_open(out);
 
-    out << indent() << "dictionary[";
+    out << indent() << "telemetryData[";
 
     t_type* key_type = get_true_type(tmap->get_key_type());
     if (key_type->is_string()) {
@@ -970,24 +968,27 @@ void t_swift_generator::telemetry_dictionary_value(ofstream& out, t_type* type, 
 
     out << "] = ";
 
+    t_type* value_type = get_true_type(tmap->get_val_type());
+    if (!value_type->is_base_type()) {
+      throw "compiler error: unsupported value type for map " + value_type->get_name();
+    }
+
     telemetry_dictionary_value(out, tmap->get_val_type(), "value", pii_kind);
 
     out << endl;
 
     block_close(out);
-
-    out << indent() << "return dictionary" << endl;
-
-    block_close(out, false);
-    out << "())";
   } else if (type->is_enum()) {
     out << ".string(" << property_name << ".telemetryName(), piiKind: " << pii_kind << ")";
   } else if (type->is_struct()) {
-    out << ".dictionary(" << property_name << ".telemetryDictionary())";
+    t_struct *tstruct = (t_struct*)type;
+    telemetry_struct_value(out, tstruct);
   }
   else {
     throw "compiler error: invalid type (" + type_name(type) + ") for property \"" + property_name + "\"";
   }
+
+  out << endl;
 }
 
 /**
