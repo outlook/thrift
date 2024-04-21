@@ -163,7 +163,8 @@ public:
   void generate_swift_struct_telemetry_object_extension(ofstream& out, t_struct* tstruct);
   void generate_swift_struct_telemetry_event_extension(ofstream& out, t_struct* tstruct);
   void telemetry_struct_value(ofstream& out, t_struct* tstruct);
-  void telemetry_dictionary_value(ofstream& out, t_type* type, string property_name, string pii_kind);
+  void telemetry_dictionary_value(ofstream& out, string name, t_type* type, string property_name, string pii_kind);
+  void telemetry_base_type_value(ofstream& out, t_base_type::t_base tbase, string property_name, string pii_kind);
   void generate_swift_struct_thrift_extension(ofstream& out,
                                               t_struct* tstruct,
                                               bool is_result,
@@ -342,7 +343,6 @@ public enum TelemetryValue: Equatable {
   case bool(Bool, piiKind: OTPiiKind?)
   case int(Int, piiKind: OTPiiKind?)
   case double(Double, piiKind: OTPiiKind?)
-  case dictionary(TelemetryDictionary)
 }
 
 )objc";
@@ -606,11 +606,9 @@ void t_swift_generator::generate_swift_struct(ofstream& out,
   vector<t_field*>::const_iterator m_iter;
 
   for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
-    out << endl;
     out << declare_property(*m_iter, is_private) << endl;
+    out << endl;
   }
-
-  out << endl;
 
   // init
 
@@ -696,8 +694,6 @@ void t_swift_generator::generate_swift_struct_init(ofstream& out,
   }
 
   block_close(out);
-
-  out << endl;
 }
 
 /**
@@ -865,12 +861,8 @@ void t_swift_generator::generate_swift_struct_telemetry_object_extension(ofstrea
   indent(out) << "extension " << tstruct->get_name() << " : TelemetryObject";
   block_open(out);
 
-  out << endl;
-
   out << indent() << "public func telemetryDictionary() -> TelemetryDictionary";
   block_open(out);
-
-  out << endl;
 
   if (contains_event_name(tstruct)) {
     out << indent() << "var telemetryData = baseProperties()" << endl;
@@ -888,7 +880,7 @@ void t_swift_generator::generate_swift_struct_telemetry_object_extension(ofstrea
   out << endl;
 }
 
-void telemetry_struct_value(ofstream& out, t_struct* tstruct) {
+void t_swift_generator::telemetry_struct_value(ofstream& out, t_struct* tstruct) {
   for (const auto& member : tstruct->get_members()) {
     bool optional = field_is_optional(member);
 
@@ -908,7 +900,7 @@ void telemetry_struct_value(ofstream& out, t_struct* tstruct) {
       pii_kind = it->second;
     }
 
-    telemetry_dictionary_value(out, member->get_type(), struct_property_name(member), pii_kind);
+    telemetry_dictionary_value(out, member->get_name(), member->get_type(), struct_property_name(member), pii_kind);
 
     if (optional) {
       block_close(out);
@@ -916,37 +908,15 @@ void telemetry_struct_value(ofstream& out, t_struct* tstruct) {
   }
 }
 
-void t_swift_generator::telemetry_dictionary_value(ofstream& out, t_type* type, string property_name, string pii_kind) {
+void t_swift_generator::telemetry_dictionary_value(ofstream& out, string name, t_type* type, string property_name, string pii_kind) {
   type = get_true_type(type);
 
   if (type->is_base_type()) {
-    out << indent() << "telemetryData[\"" << member->get_name() << "\"] = ";
+    out << indent() << "telemetryData[\"" << name << "\"] = ";
 
     t_base_type::t_base tbase = ((t_base_type*)type)->get_base();
-    switch (tbase) {
-    case t_base_type::TYPE_STRING:
-      out << ".string(" << property_name << ", piiKind: " << pii_kind << ")";
-      break;
-
-    case t_base_type::TYPE_BOOL:
-      out << ".bool(" << property_name << ", piiKind: " << pii_kind << ")";
-      break;
-
-    case t_base_type::TYPE_I8:
-    case t_base_type::TYPE_I16:
-    case t_base_type::TYPE_I32:
-    case t_base_type::TYPE_I64:
-      out << ".int(" << property_name << ", piiKind: " << pii_kind << ")";
-      break;
-
-    case t_base_type::TYPE_DOUBLE:
-      out << ".double(" << property_name << ", piiKind: " << pii_kind << ")";
-      break;
-
-    default:
-      throw "compiler error: invalid base type " + type->get_name();
-      break;
-    }
+    telemetry_base_type_value(out, tbase, property_name, pii_kind);
+    out << endl;
   } else if (type->is_map()) {
     t_map *tmap = (t_map*)type;
 
@@ -973,22 +943,50 @@ void t_swift_generator::telemetry_dictionary_value(ofstream& out, t_type* type, 
       throw "compiler error: unsupported value type for map " + value_type->get_name();
     }
 
-    telemetry_dictionary_value(out, tmap->get_val_type(), "value", pii_kind);
+    t_base_type::t_base tbase = ((t_base_type*)value_type)->get_base();
+    telemetry_base_type_value(out, tbase, "value", pii_kind);
 
     out << endl;
 
     block_close(out);
   } else if (type->is_enum()) {
+    out << indent() << "telemetryData[\"" << name << "\"] = ";
     out << ".string(" << property_name << ".telemetryName(), piiKind: " << pii_kind << ")";
+    out << endl;
   } else if (type->is_struct()) {
-    t_struct *tstruct = (t_struct*)type;
-    telemetry_struct_value(out, tstruct);
+    out << indent() << "telemetryData.merge(" << property_name << ".telemetryDictionary()) { _, child in child }";
+    out << endl;
   }
   else {
     throw "compiler error: invalid type (" + type_name(type) + ") for property \"" + property_name + "\"";
   }
+}
 
-  out << endl;
+void t_swift_generator::telemetry_base_type_value(ofstream& out, t_base_type::t_base tbase, string property_name, string pii_kind) {
+  switch (tbase) {
+  case t_base_type::TYPE_STRING:
+    out << ".string(" << property_name << ", piiKind: " << pii_kind << ")";
+    break;
+
+  case t_base_type::TYPE_BOOL:
+    out << ".bool(" << property_name << ", piiKind: " << pii_kind << ")";
+    break;
+
+  case t_base_type::TYPE_I8:
+  case t_base_type::TYPE_I16:
+  case t_base_type::TYPE_I32:
+  case t_base_type::TYPE_I64:
+    out << ".int(" << property_name << ", piiKind: " << pii_kind << ")";
+    break;
+
+  case t_base_type::TYPE_DOUBLE:
+    out << ".double(" << property_name << ", piiKind: " << pii_kind << ")";
+    break;
+
+  default:
+    throw "compiler error: invalid base type";
+    break;
+  }
 }
 
 /**
