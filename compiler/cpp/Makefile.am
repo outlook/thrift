@@ -121,7 +121,7 @@ thrift_SOURCES += src/thrift/generate/t_c_glib_generator.cc \
                   src/thrift/generate/t_lua_generator.cc \
                   src/thrift/generate/t_rs_generator.cc
 
-thrift_CPPFLAGS = -I$(srcdir)/src
+thrift_CPPFLAGS = -I$(srcdir)/src -I/opt/homebrew/Cellar/boost/1.86.0_1
 thrift_CXXFLAGS = -Wall -Wextra -pedantic -Werror
 thrift_LDADD = @LEXLIB@ src/thrift/libparse.a
 
