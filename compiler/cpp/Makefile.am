@@ -121,7 +121,7 @@ thrift_SOURCES += src/thrift/generate/t_c_glib_generator.cc \
                   src/thrift/generate/t_lua_generator.cc \
                   src/thrift/generate/t_rs_generator.cc
 
-thrift_CPPFLAGS = -I$(srcdir)/src -I/opt/homebrew/Cellar/boost/1.86.0_1
+thrift_CPPFLAGS = -I$(srcdir)/src -I/opt/homebrew/Cellar/boost/1.86.0_1/include
 thrift_CXXFLAGS = -Wall -Wextra -pedantic -Werror
 thrift_LDADD = @LEXLIB@ src/thrift/libparse.a
 
@@ -145,7 +145,7 @@ libthriftc_la_SOURCES = $(compiler_core) \
                         src/thrift/logging.cc
 
 
-libthriftc_la_CPPFLAGS = -I$(srcdir)/src -Isrc -I$(top_builddir)/lib/cpp/src -I/opt/homebrew/Cellar/boost/1.86.0_1/include -DTHRIFT_ENABLE_PLUGIN=1
+libthriftc_la_CPPFLAGS = -I$(srcdir)/src -Isrc -I$(top_builddir)/lib/cpp/src -DTHRIFT_ENABLE_PLUGIN=1
 libthriftc_la_CXXFLAGS = -Wall -Wextra -pedantic
 libthriftc_la_LIBADD = $(top_builddir)/lib/cpp/libthrift.la
 
