@@ -15,10 +15,17 @@ jobs:
           export LDFLAGS="-L/opt/homebrew/opt/bison@2.7/lib"
 
       - name: Boostrap
-        run: ./bootstrap.sh
+        run: |
+          echo 'export PATH="/opt/homebrew/opt/bison@2.7/bin:$PATH"' >> /Users/runner/.bash_profile
+          export LDFLAGS="-L/opt/homebrew/opt/bison@2.7/lib"
+          
+          ./bootstrap.sh
 
       - name: Configure
         run: |
+          echo 'export PATH="/opt/homebrew/opt/bison@2.7/bin:$PATH"' >> /Users/runner/.bash_profile
+          export LDFLAGS="-L/opt/homebrew/opt/bison@2.7/lib"
+          
           export CFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
           export CXXFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
 
@@ -26,6 +33,9 @@ jobs:
 
       - name: Make
         run: |
+          echo 'export PATH="/opt/homebrew/opt/bison@2.7/bin:$PATH"' >> /Users/runner/.bash_profile
+          export LDFLAGS="-L/opt/homebrew/opt/bison@2.7/lib"
+          
           export CFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
           export CXXFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
 
