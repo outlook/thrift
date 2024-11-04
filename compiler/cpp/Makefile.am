@@ -145,7 +145,7 @@ libthriftc_la_SOURCES = $(compiler_core) \
                         src/thrift/logging.cc
 
 
-libthriftc_la_CPPFLAGS = -I$(srcdir)/src -Isrc -I$(top_builddir)/lib/cpp/src -DTHRIFT_ENABLE_PLUGIN=1
+libthriftc_la_CPPFLAGS = -I$(srcdir)/src -Isrc -I$(top_builddir)/lib/cpp/src -I/opt/homebrew/Cellar/boost/1.86.0_1 -DTHRIFT_ENABLE_PLUGIN=1
 libthriftc_la_CXXFLAGS = -Wall -Wextra -pedantic
 libthriftc_la_LIBADD = $(top_builddir)/lib/cpp/libthrift.la
 
