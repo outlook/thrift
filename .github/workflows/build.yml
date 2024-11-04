@@ -9,31 +9,21 @@ jobs:
       - name: Install dependencies
         run: brew install autoconf automake bison pkg-config boost libtool
 
-      - name: Update PATH
+      - name: Update environment variables
         run: |
           echo "/opt/homebrew/opt/bison/bin" >> $GITHUB_PATH
           export LDFLAGS="-L/opt/homebrew/opt/bison/lib"
-          whereis bison
-
-      - name: Boostrap
-        run: |
-          whereis bison
-          ./bootstrap.sh
-
-      - name: Configure
-        run: |
           export CFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
           export CXXFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
-          whereis bison
 
-          ./configure
+      - name: Boostrap
+        run: ./bootstrap.sh
+
+      - name: Configure
+        run: ./configure
 
       - name: Make
         run: |
-          export CFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
-          export CXXFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
-          whereis bison
-
           cd ./compiler/cpp
           make
 
