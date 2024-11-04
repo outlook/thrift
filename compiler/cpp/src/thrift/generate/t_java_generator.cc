@@ -5300,7 +5300,6 @@ void t_java_generator::generate_java_struct_tuple_writer(ofstream& out, t_struct
         generate_serialize_field(out, (*f_iter), "struct.", false);
         indent_down();
         indent(out) << "}" << endl;
-        j++;
       }
     }
   }
