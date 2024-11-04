@@ -22,7 +22,7 @@
 # details.
 
 AUTOMAKE_OPTIONS = subdir-objects
-BOOST_LIB = /opt/homebrew/Cellar/boost/1.86.0_1
+BOOST_LIB := $(shell brew --prefix boost)
 
 # Note on why we have src/thrift and src/thrift/plugin directories:
 # Since Automake supports only one set of BUILT_SOURCES per file and does not allow
