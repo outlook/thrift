@@ -24,6 +24,7 @@ jobs:
 
       - name: Make
         run: |
+          ls /opt/homebrew/Cellar/boost/1.86.0_1/include/boost/property_tree/
           cd ./compiler/cpp
           make
 
