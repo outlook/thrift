@@ -9,16 +9,16 @@ jobs:
       - name: Install dependencies
         run: brew install autoconf automake bison@2.7 pkg-config boost libtool
 
-      - name: Boostrap
+      - name: Update PATH
         run: |
-          export PATH="/usr/local/opt/bison@2.7/bin:$PATH"
+          echo 'export PATH="/opt/homebrew/opt/bison@2.7/bin:$PATH"' >> /Users/runner/.bash_profile
+          export LDFLAGS="-L/opt/homebrew/opt/bison@2.7/lib"
 
-          ./bootstrap.sh
+      - name: Boostrap
+        run: ./bootstrap.sh
 
       - name: Configure
         run: |
-          export PATH="/usr/local/opt/bison@2.7/bin:$PATH"
-
           export CFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
           export CXXFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
 
@@ -26,8 +26,6 @@ jobs:
 
       - name: Make
         run: |
-          export PATH="/usr/local/opt/bison@2.7/bin:$PATH"
-
           export CFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
           export CXXFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
 
