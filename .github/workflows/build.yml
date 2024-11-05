@@ -2,35 +2,28 @@ name: Build
 on: [push]
 jobs:
   Build:
-    runs-on: macos-12
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v3
 
       - name: Install dependencies
-        run: brew install autoconf automake bison pkg-config boost
+        run: brew install autoconf automake bison pkg-config boost libtool
 
-      - name: Boostrap
+      - name: Update environment variables
         run: |
-          export PATH="/usr/local/opt/bison/bin:$PATH"
-
-          ./bootstrap.sh
-
-      - name: Configure
-        run: |
-          export PATH="/usr/local/opt/bison/bin:$PATH"
-
+          echo "/opt/homebrew/opt/bison/bin" >> $GITHUB_PATH
+          export LDFLAGS="-L/opt/homebrew/opt/bison/lib"
           export CFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
           export CXXFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
 
-          ./configure
+      - name: Boostrap
+        run: ./bootstrap.sh
+
+      - name: Configure
+        run: ./configure
 
       - name: Make
         run: |
-          export PATH="/usr/local/opt/bison/bin:$PATH"
-
-          export CFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
-          export CXXFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
-
           cd ./compiler/cpp
           make
 
@@ -41,7 +34,7 @@ jobs:
         run: zip -j ./thrift.zip ./compiler/cpp/thrift
 
       - name: 'Upload Artifact'
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: thrift.zip
           path: ./thrift.zip

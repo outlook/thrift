@@ -22,6 +22,7 @@
 # details.
 
 AUTOMAKE_OPTIONS = subdir-objects
+BOOST_LIB := $(shell brew --prefix boost)
 
 # Note on why we have src/thrift and src/thrift/plugin directories:
 # Since Automake supports only one set of BUILT_SOURCES per file and does not allow
@@ -121,7 +122,7 @@ thrift_SOURCES += src/thrift/generate/t_c_glib_generator.cc \
                   src/thrift/generate/t_lua_generator.cc \
                   src/thrift/generate/t_rs_generator.cc
 
-thrift_CPPFLAGS = -I$(srcdir)/src
+thrift_CPPFLAGS = -I$(srcdir)/src -I$(BOOST_LIB)/include
 thrift_CXXFLAGS = -Wall -Wextra -pedantic -Werror
 thrift_LDADD = @LEXLIB@ src/thrift/libparse.a
 
