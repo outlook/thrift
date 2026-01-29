@@ -330,7 +330,7 @@ string t_swift_generator::telemetry_object_protocols() {
   return R"objc(
 public typealias TelemetryDictionary = [String: TelemetryValue]
 
-public protocol TelemetryObject {
+public protocol TelemetryObject: Sendable {
   func telemetryDictionary() -> TelemetryDictionary
 }
 
