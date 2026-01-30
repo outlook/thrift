@@ -590,7 +590,6 @@ void t_hs_generator::generate_hs_struct_arbitrary(ofstream& out, t_struct* tstru
   string tname = type_name(tstruct);
   string name = tstruct->get_name();
   const vector<t_field*>& members = tstruct->get_members();
-  vector<t_field*>::const_iterator m_iter;
 
   indent(out) << "instance QC.Arbitrary " << tname << " where " << endl;
   indent_up();
@@ -654,7 +653,6 @@ void t_hs_generator::generate_hs_struct_arbitrary(ofstream& out, t_struct* tstru
  */
 void t_hs_generator::generate_hs_struct_reader(ofstream& out, t_struct* tstruct) {
   const vector<t_field*>& fields = tstruct->get_members();
-  vector<t_field*>::const_iterator f_iter;
 
   string sname = type_name(tstruct);
   string id = tmp("_id");
@@ -725,7 +723,6 @@ void t_hs_generator::generate_hs_struct_reader(ofstream& out, t_struct* tstruct)
 void t_hs_generator::generate_hs_struct_writer(ofstream& out, t_struct* tstruct) {
   string name = type_name(tstruct);
   const vector<t_field*>& fields = tstruct->get_sorted_members();
-  vector<t_field*>::const_iterator f_iter;
   string str = tmp("_str");
   string f = tmp("_f");
   string v = tmp("_v");
@@ -909,7 +906,6 @@ void t_hs_generator::generate_hs_function_helpers(t_function* tfunction) {
 void t_hs_generator::generate_hs_typemap(ofstream& out, t_struct* tstruct) {
   string name = type_name(tstruct);
   const vector<t_field*>& fields = tstruct->get_sorted_members();
-  vector<t_field*>::const_iterator f_iter;
 
   indent(out) << "typemap_" << name << " :: T.TypeMap" << endl;
   indent(out) << "typemap_" << name << " = Map.fromList [";

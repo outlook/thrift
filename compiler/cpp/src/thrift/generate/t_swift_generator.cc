@@ -330,7 +330,7 @@ string t_swift_generator::telemetry_object_protocols() {
   return R"objc(
 public typealias TelemetryDictionary = [String: TelemetryValue]
 
-public protocol TelemetryObject {
+public protocol TelemetryObject: Sendable {
   func telemetryDictionary() -> TelemetryDictionary
 }
 
@@ -440,7 +440,7 @@ void t_swift_generator::generate_enum(t_enum* tenum) {
 void t_swift_generator::generate_enum(ofstream& f_enum_decl, ofstream& f_enum_impl, t_enum* tenum) {
   print_doc(f_enum_decl, tenum, false);
 
-  f_enum_decl << indent() << "public enum " << tenum->get_name() << " : Int32";
+  f_enum_decl << indent() << "public enum " << tenum->get_name() << " : Int, Sendable";
   block_open(f_enum_decl);
 
   vector<t_enum_value*> constants = tenum->get_constants();
@@ -596,7 +596,10 @@ void t_swift_generator::generate_swift_struct(ofstream& out,
   out << indent() << visibility << " " << object_type << " " << tstruct->get_name();
 
   if (tstruct->is_xception()) {
-    out << " : ErrorType";
+    out << " : ErrorType, @unchecked Sendable";
+  }
+  else {
+    out << " : @unchecked Sendable";
   }
 
   block_open(out);

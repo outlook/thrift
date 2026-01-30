@@ -2,7 +2,7 @@ name: Build
 on: [push]
 jobs:
   Build:
-    runs-on: macos-latest
+    runs-on: macos-15-intel  # Uses x86_64 (Intel) runners - newer supported version
     steps:
       - uses: actions/checkout@v3
 
@@ -11,10 +11,11 @@ jobs:
 
       - name: Update environment variables
         run: |
-          echo "/opt/homebrew/opt/bison/bin" >> $GITHUB_PATH
-          export LDFLAGS="-L/opt/homebrew/opt/bison/lib"
-          export CFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
-          export CXXFLAGS="-Wno-deprecated-copy-with-user-provided-copy"
+          echo "/usr/local/opt/bison/bin" >> $GITHUB_PATH
+          export LDFLAGS="-L/usr/local/opt/bison/lib"
+          export CFLAGS="-Wno-deprecated-copy-with-user-provided-copy -arch x86_64"
+          export CXXFLAGS="-Wno-deprecated-copy-with-user-provided-copy -arch x86_64"
+          export LDFLAGS="$LDFLAGS -arch x86_64"
 
       - name: Boostrap
         run: ./bootstrap.sh

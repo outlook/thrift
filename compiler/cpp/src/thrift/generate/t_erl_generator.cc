@@ -385,7 +385,6 @@ void t_erl_generator::close_generator() {
 }
 
 void t_erl_generator::generate_type_metadata(std::string function_name, vector<string> names) {
-  vector<string>::iterator s_iter;
   size_t num_structs = names.size();
 
   indent(f_types_file_) << function_name << "() ->\n";
@@ -915,7 +914,6 @@ void t_erl_generator::generate_service(t_service* tservice) {
 void t_erl_generator::generate_service_metadata(t_service* tservice) {
   export_string("function_names", 0);
   vector<t_function*> functions = tservice->get_functions();
-  vector<t_function*>::iterator f_iter;
   size_t num_functions = functions.size();
 
   indent(f_service_) << "function_names() -> " << endl;
